@@ -15,8 +15,36 @@ init -4 python:
         "tm_btn_text": 20, "tm_tab_text": 20, "tm_pm_text": 26,
         "tm_foot": 16, "tm_head_btn_text": 18, "tm_head_title": 23, "tm_icon_text": 19,
         "tm_hud_label": 17, "tm_hint_h": 19, "tm_hint_choice": 18, "tm_hint_note": 15,
-        "tm_hint_eff": 16, "tm_tip": 16, "tm_ico_label": 20,
+        "tm_hint_eff": 16, "tm_tip": 16, "tm_ico_label": 20, "tm_side_text": 19, "tm_side_text": 19,
     }
+
+    # «Настройки» -> «Клавиши»: все клавиши меню одним списком (то же — в справке, F1)
+    TM_KEYS_LIST = [
+        (u"Shift+T", u"открыть и закрыть меню (и запасная клавиша)"),
+        (u"Esc", u"закрыть меню"),
+        (u"F1", u"справка"),
+        (u"Shift+H", u"подсказки к выборам"),
+        (u"Shift+B", u"заметка о баге"),
+        (u"Ctrl+Z", u"отменить последнюю правку"),
+        (u"Shift+F5 / F9", u"сохранить / загрузить слот 1"),
+        (u"Ctrl", u"скип текста"),
+        (u"PgUp / PgDn", u"страницы «Значений»"),
+        (u"Shift+O", u"консоль (если включена)"),
+    ]
+
+    # «Настройки» -> «Клавиши»: все клавиши меню одним списком (то же — в справке, F1)
+    TM_KEYS_LIST = [
+        (u"Shift+T", u"открыть и закрыть меню (и запасная клавиша)"),
+        (u"Esc", u"закрыть меню"),
+        (u"F1", u"справка"),
+        (u"Shift+H", u"подсказки к выборам"),
+        (u"Shift+B", u"заметка о баге"),
+        (u"Ctrl+Z", u"отменить последнюю правку"),
+        (u"Shift+F5 / F9", u"сохранить / загрузить слот 1"),
+        (u"Ctrl", u"скип текста"),
+        (u"PgUp / PgDn", u"страницы «Значений»"),
+        (u"Shift+O", u"консоль (если включена)"),
+    ]
 
     def tm_pref(name, default):
         v = getattr(store.persistent, name, None)
@@ -113,7 +141,7 @@ init -4 python:
             _acc = Frame(Transform(_bt, matrixcolor=TintMatrix(a)), 13, 13)
             style.tm_border.background = Frame(Transform("tm_ui/tm_ring.png", matrixcolor=TintMatrix(a)), 26, 26)
             style.tm_panel.background = Frame(Transform("tm_ui/tm_panel.png", alpha=_opa), 26, 26)
-            style.tm_header_bg.background = Frame(Transform("tm_ui/tm_head.png", matrixcolor=TintMatrix(a)), 26, 26, 26, 6)
+            style.tm_header_bg.background = Frame(Transform("tm_ui/tm_head.png", matrixcolor=TintMatrix(TM_TOK["bg_card"])), 26, 26, 26, 6)
             style.tm_footer_bg.background = Frame("tm_ui/tm_foot.png", 26, 6, 26, 26)
             style.tm_btn.background = _idle
             style.tm_btn.hover_background = _acc
@@ -131,10 +159,15 @@ init -4 python:
             style.tm_icon_btn.selected_background = _acc
             style.tm_hud_frame.background = Frame(Transform("tm_ui/tm_panel.png", alpha=0.86), 26, 26)
             style.tm_hint_frame.background = Frame(Transform("tm_ui/tm_panel.png", alpha=0.92), 26, 26)
-            style.tm_head_btn.background = Frame(Transform(_bt, matrixcolor=TintMatrix(TM_TOK["on_accent"]), alpha=0.16), 13, 13)
-            style.tm_head_btn.hover_background = Frame(Transform(_bt, matrixcolor=TintMatrix(TM_TOK["on_accent"]), alpha=0.34), 13, 13)
+            style.tm_head_btn.background = _idle
+            style.tm_head_btn.hover_background = _acc
+            style.tm_btn.selected_background = _acc
+            style.tm_side_btn.hover_background = _idle
+            style.tm_side_btn.selected_background = Frame(Transform(_bt, alpha=0.13), 13, 13)
         else:
-            style.tm_header_bg.background = Solid(a)
+            style.tm_header_bg.background = Solid(TM_TOK["bg_card"])
+            style.tm_btn.selected_background = Frame(Solid(a), 8, 8)
+            style.tm_head_btn.hover_background = Frame(Solid(a), 8, 8)
             style.tm_border.background = Frame(Solid(a), 0, 0)
             style.tm_btn.hover_background = Frame(Solid(a), 8, 8)
             style.tm_pm_btn.hover_background = Frame(Solid(a), 8, 8)
@@ -204,18 +237,19 @@ init -4 python:
          u"(Shift+F5 — сохранить в слот 1, Shift+F9 — загрузить), мгновенный скип текста. Перед переходами меню "
          u"само сохраняет слот «Перед прыжком». Журнал правок: любую правку можно отменить, Ctrl+Z — последнюю."),
         ("stats", u"Значения",
-         u"Статы игры с понятными именами, по группам. Звезда — в избранное (наверху списка), глаз — в HUD. "
-         u"Цветная отметка +2 или −50 рядом со значением — игра изменила его с прошлого открытия меню, "
-         u"кнопка «изменённые» оставит только такие. Снежинка — заморозить; знак рядом меняет вид: "
-         u"= ровно, ≥ не меньше, ≤ не больше. Мишень — следующий порог из условий сценария. "
-         u"Щелчок по имени — дать своё. В окне ввода +50, -10, *2 — от текущего значения, =-5 — точное. "
-         u"Значения можно сохранить в файл и загрузить в другой партии. PgUp и PgDn листают страницы."),
+         u"Статы игры с понятными именами, по группам. − и + меняют на шаг, щелчок по числу — ввести точное: "
+         u"+50, -10, *2 — от текущего значения, =-5 — точное. «•••» в строке — заморозить (знак рядом меняет "
+         u"вид: = ровно, ≥ не меньше, ≤ не больше), в избранное (наверху списка), в HUD, до следующего порога "
+         u"из условий сценария. Цветная отметка +2 или −50 — игра изменила значение с прошлого открытия меню, "
+         u"«изменённые» оставит только такие. Щелчок по имени — дать своё. «•••» над списком — источник списка, "
+         u"проверка, перенос значений в другую партию, профиль. PgUp и PgDn листают страницы."),
         ("actions", u"Выдача / Код",
          u"Готовые действия игры (если их задали в студии) и свой Python-код: выражение покажет значение, "
          u"команда выполнится. Enter — выполнить."),
-        ("scanner", u"Поиск",
-         u"Не нашёл переменную? «Снимок», поиграй и вернись: «изменились», «больше», «меньше», "
-         u"«изменилось на» (потратил 50 — введи -50) оставят подходящие. «Шаг назад» отменяет сужение."),
+        ("scanner", u"Найти переменную",
+         u"«Значения» → «Найти переменную»: нет нужного в списке? «Снимок», поиграй и вернись: «изменились», "
+         u"«больше», «меньше», «изменилось на» (потратил 50 — введи -50) оставят подходящие. «Шаг назад» "
+         u"отменяет сужение, «в мои статы» закрепляет найденное."),
         ("story", u"Сюжет",
          u"Shift+H — подсказки к выборам и к кнопкам экранов-развилок; у скрытого варианта видны текущие "
          u"значения из условия, «код» показывает, что стоит за вариантом в сценарии. История выборов — "
@@ -243,8 +277,7 @@ init -4 python:
             tabs.append(("actions", u"Выдача", u"Предметы, деньги и прочее кодом игры; свой Python-код"))
         else:
             tabs.append(("actions", u"Код", u"Свой Python-код в игре: значение или команда"))
-        tabs += [("scanner", u"Поиск", u"Найти неизвестную переменную: снимок и сужение"),
-                 ("story", u"Сюжет", u"Подсказки выборов, переход к метке и реплике, галерея, персонажи"),
+        tabs += [("story", u"Сюжет", u"Подсказки выборов, переход к метке и реплике, галерея, персонажи"),
                  ("checklist", u"Тест", u"Авто-прохождение, маршруты, покрытие, непросмотренные сцены, заметки о багах"),
                  ("settings", u"Настройки", u"Цвет, прозрачность, размер, HUD, консоль")]
         return tabs

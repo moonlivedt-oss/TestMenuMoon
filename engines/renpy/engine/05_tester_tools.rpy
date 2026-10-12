@@ -740,8 +740,10 @@ init -3 python:
             tm_ui.bridge = bool(d.get("bridge", False))
             if d.get("step") in (1, 5, 10, 50):
                 tm_ui.stat_step = d["step"]
-            if d.get("tab") in ("rewind", "stats", "actions", "scanner", "story", "checklist", "settings"):
+            if d.get("tab") in ("rewind", "stats", "actions", "story", "checklist", "settings"):
                 tm_ui.tab = d["tab"]
+            elif d.get("tab") == "scanner":   # вкладка «Поиск» теперь внутри «Значений»
+                tm_ui.tab, tm_ui.vals_mode = "stats", "scan"
             wp = d.get("win_pos")
             tm_ui.win_pos = (int(wp[0]), int(wp[1])) if wp and len(wp) == 2 else None
             tm_ui.extra = [tuple(e) for e in d.get("extra") or [] if len(e) == 2]

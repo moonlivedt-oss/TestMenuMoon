@@ -122,6 +122,18 @@ init -10 python:
             self.bug_shot = None      # скриншот к заметке о баге (снят до открытия окна)
             self.bug_pending = False  # меню спрятано, через кадр снимаем экран для заметки
             self.label_prev = None    # чужой config.label_callback (цепочка)
+            # --- компоновка 2026-10-13 ---
+            self.vals_mode = "stats"  # «Значения»: stats — мои статы, scan — найти переменную
+            self.row_open = ""        # «Значения»: строка с раскрытыми редкими действиями
+            self.vals_tools = False   # «Значения»: ряд инструментов списка (за «•••»)
+            self.test_sec = "auto"    # «Тест»: раздел слева
+            self.set_sec = "look"     # «Настройки»: раздел слева
+            # --- компоновка 2026-10-13 ---
+            self.vals_mode = "stats"  # «Значения»: stats — мои статы, scan — найти переменную
+            self.row_open = ""        # «Значения»: строка с раскрытыми редкими действиями
+            self.vals_tools = False   # «Значения»: ряд инструментов списка (за «•••»)
+            self.test_sec = "auto"    # «Тест»: раздел слева
+            self.set_sec = "look"     # «Настройки»: раздел слева
 
     tm_ui = _TmUI()
 

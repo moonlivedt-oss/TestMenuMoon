@@ -126,21 +126,105 @@ screen tm_tab_rewind():
                     bar value Preference("text speed") style "tm_bar" yalign 0.5
                 text "Правее — текст появляется быстрее (в самом правом — мгновенно)." style "tm_dim"
 
-# ---------------------- вкладка: характеристики ----------------------
-screen tm_tab_stats():
-    $ _mode = tm_stats_mode()
-    $ _rows, _page, _pages, _total = tm_stat_rows(tm_ui.stat_filter)
-    $ _acc = tm_acc()
+# ---------------------- вкладка: значения (мои статы | найти переменную) ----------------------
+screen tm_tab_values():
+    $ _vm = tm_ui.vals_mode
     vbox:
-        spacing 12
+        spacing 10
         fixed:
             xfill True
             ysize 44
             hbox:
-                spacing 10
+                spacing 6
                 yalign 0.5
-                text "Значения" style "tm_h" yalign 0.5
-                null width 6
+                textbutton "Мои статы":
+                    style "tm_seg" text_style "tm_seg_text"
+                    yalign 0.5
+                    selected (_vm != "scan")
+                    tooltip "Статы игры: правка, заморозка, HUD"
+                    action SetField(tm_ui, "vals_mode", "stats")
+                textbutton "Найти переменную":
+                    style "tm_seg" text_style "tm_seg_text"
+                    yalign 0.5
+                    selected (_vm == "scan")
+                    tooltip "Нет нужного в списке? Снимок, поиграй и сужай (как ArtMoney, но по именам)"
+                    action SetField(tm_ui, "vals_mode", "scan")
+            if _vm != "scan":
+                hbox:
+                    spacing 8
+                    xalign 1.0
+                    yalign 0.5
+                    text "шаг" style "tm_dim" yalign 0.5
+                    for s in (1, 5, 10, 50):
+                        textbutton "[s]":
+                            style "tm_seg" text_style "tm_seg_text"
+                            yalign 0.5
+                            selected (tm_ui.stat_step == s)
+                            tooltip "Шаг кнопок − и +"
+                            action SetField(tm_ui, "stat_step", s)
+        if _vm == "scan":
+            use tm_tab_scanner
+        else:
+            use tm_tab_stats
+
+screen tm_tab_stats():
+    $ _mode = tm_stats_mode()
+    $ _rows, _page, _pages, _total = tm_stat_rows(tm_ui.stat_filter)
+    $ _acc = tm_acc()
+    $ _open = tm_ui.row_open
+    vbox:
+        spacing 10
+        # --- фильтр, счётчики, отмена; редкие инструменты списка — за «•••» ---
+        hbox:
+            spacing 10
+            use tm_icon("scanner", 24)
+            use tm_field("stat_filter", 240, 30)
+            if tm_ui.stat_filter:
+                use tm_icobtn("close", [SetField(tm_ui, "stat_filter", ""), SetField(tm_ui, "stat_page", 0)], tip="Очистить фильтр", alt="X")
+            text ("найдено: %d" % _total) style "tm_dim" yalign 0.5
+            if tm_ui.deltas:
+                textbutton ("изменённые: %d" % len(tm_ui.deltas)):
+                    style "tm_seg" text_style "tm_seg_text"
+                    yalign 0.5
+                    selected tm_ui.only_changed
+                    tooltip "Только то, что игра изменила с прошлого открытия меню"
+                    action Function(tm_toggle_only_changed)
+            textbutton ("журнал: %d" % len(getattr(tm_ui, "changelog", []))):
+                style "tm_seg" text_style "tm_seg_text"
+                yalign 0.5
+                tooltip "Журнал изменений: что, когда и где поменяли игра, меню или заморозка"
+                action SetField(tm_ui, "log_open", True)
+            if tm_ui.journal:
+                $ _jp, _jo, _jn = tm_ui.journal[-1]
+                textbutton ("отменить (%d)" % len(tm_ui.journal)):
+                    style "tm_seg" text_style "tm_seg_text"
+                    yalign 0.5
+                    tooltip (u"Ctrl+Z — вернуть %s = %s" % (tm_nice(_jp, _jp)[0], tm_fmt(_jo, 20)))
+                    action Function(tm_undo)
+            if tm_ui.frozen:
+                button:
+                    style "tm_seg"
+                    yalign 0.5
+                    tooltip "Снять все заморозки"
+                    action Function(tm_freeze_clear)
+                    hbox:
+                        spacing 6
+                        use tm_icon("snow", 22)
+                        text ("%d  снять" % len(tm_ui.frozen)) style "tm_seg_text" yalign 0.5
+            textbutton "•••":
+                style "tm_seg" text_style "tm_seg_text"
+                yalign 0.5
+                selected tm_ui.vals_tools
+                tooltip "Источник списка, проверка путей, перенос значений, профиль"
+                action ToggleField(tm_ui, "vals_tools")
+            if _pages > 1:
+                textbutton "‹" style "tm_icon_btn" text_style "tm_icon_text" sensitive (_page > 0) action Function(tm_stat_page, -1)
+                text ("%d / %d" % (_page + 1, _pages)) style "tm_dim" yalign 0.5
+                textbutton "›" style "tm_icon_btn" text_style "tm_icon_text" sensitive (_page < _pages - 1) action Function(tm_stat_page, 1)
+        if tm_ui.vals_tools:
+            hbox:
+                spacing 8
+                text "список:" style "tm_dim" yalign 0.5
                 # источник: data-файл игры или авто-поиск (переключатель — только если data есть)
                 if getattr(store, "tm_stats", None):
                     textbutton "из data" style "tm_seg" text_style "tm_seg_text" yalign 0.5 selected (_mode == "data") tooltip "Список статов, заданный для этой игры в студии" action Function(tm_set_stats_mode, "data")
@@ -150,24 +234,8 @@ screen tm_tab_stats():
                 use tm_icobtn("bug", Function(tm_diag_run), tip="Проверить: все ли пути читаются и в границах", alt="?")
                 use tm_icobtn("download", Function(tm_values_export), tip="Сохранить значения списка и избранного в tm_values.json (папка игры) — для переноса в другую партию", alt="S")
                 use tm_icobtn("upload", Function(tm_values_import), tip="Загрузить значения из tm_values.json: те же переменные получат сохранённые значения (Ctrl+Z отменяет)", alt="L")
-                if tm_ui.journal:
-                    $ _jp, _jo, _jn = tm_ui.journal[-1]
-                    textbutton ("отменить (%d)" % len(tm_ui.journal)):
-                        style "tm_seg" text_style "tm_seg_text"
-                        yalign 0.5
-                        tooltip (u"Ctrl+Z — вернуть %s = %s" % (tm_nice(_jp, _jp)[0], tm_fmt(_jo, 20)))
-                        action Function(tm_undo)
                 if tm_ui.frozen:
-                    button:
-                        style "tm_seg"
-                        yalign 0.5
-                        tooltip "Снять все заморозки"
-                        action Function(tm_freeze_clear)
-                        hbox:
-                            spacing 6
-                            use tm_icon("snow", 22)
-                            text ("%d  снять" % len(tm_ui.frozen)) style "tm_seg_text" yalign 0.5
-                    textbutton "в профиль":
+                    textbutton "заморозки в профиль":
                         style "tm_seg" text_style "tm_seg_text"
                         yalign 0.5
                         tooltip "Профиль игры: эти заморозки будут ставиться сами при каждом запуске"
@@ -178,53 +246,16 @@ screen tm_tab_stats():
                         yalign 0.5
                         tooltip "Удалить профиль игры (текущие заморозки не снимаются)"
                         action Function(tm_profile_clear)
-            hbox:
-                spacing 8
-                xalign 1.0
-                yalign 0.5
-                text "шаг" style "tm_dim" yalign 0.5
-                for s in (1, 5, 10, 50):
-                    textbutton "[s]":
-                        style "tm_seg" text_style "tm_seg_text"
-                        yalign 0.5
-                        selected (tm_ui.stat_step == s)
-                        tooltip "Шаг кнопок − и +"
-                        action SetField(tm_ui, "stat_step", s)
-
-        # --- фильтр + страницы ---
-        hbox:
-            spacing 10
-            use tm_icon("scanner", 26)
-            use tm_field("stat_filter", 300, 30)
-            if tm_ui.stat_filter:
-                use tm_icobtn("close", [SetField(tm_ui, "stat_filter", ""), SetField(tm_ui, "stat_page", 0)], tip="Очистить фильтр", alt="X")
-            text ("найдено: %d" % _total) style "tm_dim" yalign 0.5
-            textbutton ("журнал: %d" % len(getattr(tm_ui, "changelog", []))):
-                style "tm_seg" text_style "tm_seg_text"
-                yalign 0.5
-                tooltip "Журнал изменений: что, когда и где поменяли игра, меню или заморозка"
-                action SetField(tm_ui, "log_open", True)
-            if tm_ui.deltas:
-                textbutton ("изменённые: %d" % len(tm_ui.deltas)):
-                    style "tm_seg" text_style "tm_seg_text"
-                    yalign 0.5
-                    selected tm_ui.only_changed
-                    tooltip "Только то, что игра изменила с прошлого открытия меню"
-                    action Function(tm_toggle_only_changed)
-            if _pages > 1:
-                textbutton "‹" style "tm_icon_btn" text_style "tm_icon_text" sensitive (_page > 0) action Function(tm_stat_page, -1)
-                text ("%d / %d" % (_page + 1, _pages)) style "tm_dim" yalign 0.5
-                textbutton "›" style "tm_icon_btn" text_style "tm_icon_text" sensitive (_page < _pages - 1) action Function(tm_stat_page, 1)
 
         use tm_sep
 
         if not _rows:
             if tm_ui.only_changed:
-                use tm_empty("search", "Среди переменных списка изменённых нет (изменилось что-то вне списка — ищи на вкладке «Поиск»).")
+                use tm_empty("search", "Среди переменных списка изменённых нет (изменилось что-то вне списка — ищи в «Найти переменную»).")
             elif tm_ui.stat_filter:
                 use tm_empty("search", "Ничего не найдено по фильтру.")
             else:
-                use tm_empty("think", "Переменных не найдено. Начни игру (авто-поиск видит переменные текущей партии) или найди нужное на вкладке «Поиск».")
+                use tm_empty("think", "Переменных не найдено. Начни игру (авто-поиск видит переменные текущей партии) или найди нужное в «Найти переменную».")
         else:
             viewport:
                 scrollbars "vertical"
@@ -233,7 +264,7 @@ screen tm_tab_stats():
                 yfill True
                 xfill True
                 vbox:
-                    spacing 6
+                    spacing 4
                     for _r in _rows:
                         $ label, path = _r[0], _r[1]
                         if not path:
@@ -252,56 +283,99 @@ screen tm_tab_stats():
                             $ _num = isinstance(val, _TM_NUM) and not isinstance(val, bool)
                             $ _lt, _out, _cdn, _cup = tm_stat_view(path, val) if _num else (u"", False, True, True)
                             $ _nice, _mean, _tip = tm_row_info(label, path)
-                            hbox:
-                                spacing 8
-                                use tm_icobtn("star", Function(tm_fav_toggle, path), sel=tm_is_fav(path), tip="Избранное: закрепить наверху списка (запоминается для этой игры)", alt="*")
-                                use tm_icobtn("eye", Function(tm_watch_toggle, label, path), sel=tm_watched(path), tip="Показывать в HUD поверх игры", alt="o")
-                                button:
-                                    style "tm_name_btn"
-                                    xsize 270
-                                    yalign 0.5
-                                    tooltip _tip
-                                    action Function(tm_rename, path, _nice)
-                                    vbox:
-                                        text tm_q(_tm_short(_nice, 30)) style "tm_label"
-                                        text tm_q(_tm_short(_mean if _nice == path else (path + u" | " + _mean), 40)) style "tm_dim" size 14 layout "nobreak"
-                                $ _dt = tm_delta_text(path)
-                                hbox:
-                                    xminimum 200
-                                    spacing 8
-                                    yalign 0.5
-                                    if not _ok:
-                                        text "путь не найден" style "tm_bad" yalign 0.5
-                                    elif val is None:
-                                        text "None" style "tm_warn" yalign 0.5
-                                    else:
-                                        text tm_fmt(val, 12) style ("tm_warn" if _out else "tm_value") yalign 0.5
-                                    if _dt:
-                                        text tm_q(_dt[0]) style "tm_dim" size 15 color _dt[1] bold True yalign 0.5
-                                    if _lt:
-                                        text tm_q(_lt) style "tm_dim" size 15 color (TM_TOK["warn"] if _out else TM_TOK["text_off"]) yalign 0.5
-                                if isinstance(val, bool):
-                                    textbutton ("ВКЛ" if val else "выкл"):
-                                        style "tm_btn" text_style "tm_btn_text"
-                                        action Function(tm_toggle, path)
-                                    use tm_icobtn("snow", Function(tm_freeze_toggle, path), sel=(path in tm_ui.frozen), tip="Заморозить флаг: игра не сможет его переключить", alt="*")
-                                elif _num:
-                                    textbutton "−" style "tm_pm_btn" text_style "tm_pm_text" sensitive _cdn tooltip ("Уже минимум" if not _cdn else "Уменьшить на шаг") action Function(tm_add, path, -tm_ui.stat_step)
-                                    textbutton "+" style "tm_pm_btn" text_style "tm_pm_text" sensitive _cup tooltip ("Уже максимум" if not _cup else "Увеличить на шаг") action Function(tm_add, path, tm_ui.stat_step)
-                                    textbutton "ввод" style "tm_btn" text_style "tm_btn_text" tooltip "Ввести точное значение" action Function(tm_input, path)
-                                    use tm_icobtn("snow", Function(tm_freeze_toggle, path), sel=(path in tm_ui.frozen), tip="Заморозить: игра не сможет изменить значение", alt="*")
-                                    if path in tm_ui.frozen:
-                                        textbutton tm_freeze_sign(path):
-                                            style "tm_pm_btn" text_style "tm_pm_text"
-                                            tooltip "Вид заморозки (щёлкни, чтобы сменить): = ровно это значение, ≥ не меньше, ≤ не больше"
-                                            action Function(tm_freeze_cycle, path)
-                                    $ _nt = tm_next_threshold(path, val)
-                                    if _nt is not None:
-                                        use tm_icobtn("target", Function(tm_to_threshold, path, _nt), tip=(u"Поставить %s — следующий порог из условий сценария" % _nt), alt=">")
-                                elif _ok:
-                                    textbutton "изменить" style "tm_btn" text_style "tm_btn_text" action Function(tm_input, path)
-                                    if isinstance(val, _TM_STR):
-                                        use tm_icobtn("snow", Function(tm_freeze_toggle, path), sel=(path in tm_ui.frozen), tip="Заморозить строку: игра не сможет её изменить", alt="*")
+                            $ _fz = path in tm_ui.frozen
+                            $ _fav = tm_is_fav(path)
+                            $ _wat = tm_watched(path)
+                            $ _isopen = (_open == path)
+                            $ _dt = tm_delta_text(path)
+                            $ _edit = _ok and not isinstance(val, bool)
+                            frame:
+                                style "tm_row"
+                                background (Frame(Solid(TM_TOK["frozen"] + "1c"), 8, 8) if _fz else (Frame(Solid(TM_TOK["tint_1"]), 8, 8) if _isopen else None))
+                                xfill True
+                                vbox:
+                                    spacing 6
+                                    hbox:
+                                        spacing 8
+                                        # имя (щелчок — дать своё) + значки состояния
+                                        button:
+                                            style "tm_name_btn"
+                                            xsize 340
+                                            yalign 0.5
+                                            tooltip _tip
+                                            action Function(tm_rename, path, _nice)
+                                            vbox:
+                                                hbox:
+                                                    spacing 6
+                                                    if _fav:
+                                                        use tm_icon("star", 20)
+                                                    if _wat:
+                                                        use tm_icon("eye", 20)
+                                                    if _fz:
+                                                        use tm_icon("snow", 20)
+                                                    text tm_q(_tm_short(_nice, 28)) style "tm_label" yalign 0.5
+                                                text tm_q(_tm_short(_mean if _nice == path else (path + u" | " + _mean), 40)) style "tm_dim" size 14 layout "nobreak"
+                                        # значение — ровной колонкой; щелчок по нему — ввести точное
+                                        frame:
+                                            background None
+                                            padding (0, 0)
+                                            xsize 130
+                                            yalign 0.5
+                                            if not _ok:
+                                                text "нет пути" style "tm_bad" xalign 1.0
+                                            elif val is None:
+                                                text "None" style "tm_warn" xalign 1.0
+                                            else:
+                                                textbutton tm_fmt(val, 10):
+                                                    style "tm_name_btn"
+                                                    text_style ("tm_warn" if _out else "tm_value")
+                                                    xalign 1.0
+                                                    sensitive _edit
+                                                    tooltip "Щёлкни, чтобы ввести точное значение (+50, *2, =-5)"
+                                                    action Function(tm_input, path)
+                                        hbox:
+                                            xsize 140
+                                            spacing 8
+                                            yalign 0.5
+                                            if _dt:
+                                                text tm_q(_dt[0]) style "tm_dim" size 15 color _dt[1] bold True yalign 0.5
+                                            if _lt:
+                                                text tm_q(_lt) style "tm_dim" size 15 color (TM_TOK["warn"] if _out else TM_TOK["text_off"]) yalign 0.5
+                                        if isinstance(val, bool):
+                                            textbutton ("ВКЛ" if val else "выкл"):
+                                                style "tm_btn" text_style "tm_btn_text"
+                                                yalign 0.5
+                                                xminimum 96
+                                                action Function(tm_toggle, path)
+                                        elif _num:
+                                            textbutton "−" style "tm_pm_btn" text_style "tm_pm_text" yalign 0.5 sensitive _cdn tooltip ("Уже минимум" if not _cdn else "Уменьшить на шаг") action Function(tm_add, path, -tm_ui.stat_step)
+                                            textbutton "+" style "tm_pm_btn" text_style "tm_pm_text" yalign 0.5 sensitive _cup tooltip ("Уже максимум" if not _cup else "Увеличить на шаг") action Function(tm_add, path, tm_ui.stat_step)
+                                        elif _ok:
+                                            textbutton "изменить" style "tm_btn" text_style "tm_btn_text" yalign 0.5 action Function(tm_input, path)
+                                        textbutton "•••":
+                                            style "tm_seg" text_style "tm_seg_text"
+                                            yalign 0.5
+                                            selected _isopen
+                                            tooltip "Заморозка, избранное, HUD, порог"
+                                            action SetField(tm_ui, "row_open", "" if _isopen else path)
+                                    if _isopen:
+                                        hbox:
+                                            spacing 8
+                                            if _edit:
+                                                textbutton "ввод" style "tm_btn" text_style "tm_btn_text" tooltip "Ввести точное значение" action Function(tm_input, path)
+                                            if _ok and (_num or isinstance(val, bool) or isinstance(val, _TM_STR)):
+                                                use tm_btn2("snow", ("снять заморозку" if _fz else "заморозить"), Function(tm_freeze_toggle, path), "Заморозить: игра не сможет изменить значение", sel=_fz)
+                                            if _fz and _num:
+                                                textbutton tm_freeze_sign(path):
+                                                    style "tm_pm_btn" text_style "tm_pm_text"
+                                                    tooltip "Вид заморозки (щёлкни, чтобы сменить): = ровно это значение, ≥ не меньше, ≤ не больше"
+                                                    action Function(tm_freeze_cycle, path)
+                                            use tm_btn2("star", ("из избранного" if _fav else "в избранное"), Function(tm_fav_toggle, path), "Избранное: закрепить наверху списка (запоминается для этой игры)", sel=_fav)
+                                            use tm_btn2("eye", ("из HUD" if _wat else "в HUD"), Function(tm_watch_toggle, label, path), "Показывать поверх игры", sel=_wat)
+                                            if _num:
+                                                $ _nt = tm_next_threshold(path, val)
+                                                if _nt is not None:
+                                                    use tm_btn2("target", (u"до порога %s" % _nt), Function(tm_to_threshold, path, _nt), "Поставить следующий порог из условий сценария")
 
 # ---------------------- вкладка: действия ----------------------
 screen tm_tab_actions():
@@ -394,27 +468,21 @@ screen tm_tab_scanner():
     $ _s = tm_scan_view()
     vbox:
         spacing 10
-        fixed:
-            xfill True
-            ysize 44
-            text "Найти переменную" style "tm_h" yalign 0.5
-            hbox:
-                spacing 10
-                xalign 1.0
-                yalign 0.5
-                text "тип" style "tm_dim" yalign 0.5
-                for _m, _lbl in [("num", "числа"), ("str", "строки"), ("all", "всё")]:
-                    textbutton "[_lbl]":
-                        style "tm_seg" text_style "tm_seg_text"
-                        selected (_s["mode"] == _m)
-                        action Function(tm_scan_set_mode, _m)
-        text "Как ArtMoney, но по именам: снимок → измени стат в игре (закрой меню, поиграй) → «изменились». Повторяй, пока не останется искомое. Затем «в Переменные»." style "tm_dim"
+        text "Снимок → измени стат в игре (закрой меню, поиграй) → «изменились». Повторяй, пока не останется искомое. Затем «в мои статы»." style "tm_dim"
 
         hbox:
             spacing 10
             use tm_btn2("camera", "Снимок / сброс", Function(tm_scan_snapshot), "Запомнить все значения игры сейчас")
             use tm_btn2("close", "Очистить", Function(tm_scan_reset), "Забыть снимок и кандидатов")
             use tm_btn2("back", "Шаг назад", Function(tm_scan_back), "Отменить последнее сужение", sens=_s["hist"])
+            null width 10
+            text "тип" style "tm_dim" yalign 0.5
+            for _m, _lbl in [("num", "числа"), ("str", "строки"), ("all", "всё")]:
+                textbutton "[_lbl]":
+                    style "tm_seg" text_style "tm_seg_text"
+                    yalign 0.5
+                    selected (_s["mode"] == _m)
+                    action Function(tm_scan_set_mode, _m)
 
         hbox:
             spacing 10
@@ -467,5 +535,5 @@ screen tm_tab_scanner():
                                     text tm_q(_tm_short(_p, 48)) style "tm_dim" size 14
                             text (tm_fmt(_o, 9) + u" → " + tm_fmt(_c, 9)) style "tm_value" size 18 yalign 0.5 min_width 180
                             textbutton "ввод" style "tm_btn" text_style "tm_btn_text" action Function(tm_input, _p)
-                            textbutton "в Переменные" style "tm_btn" text_style "tm_btn_text" tooltip (u"Закрепить на вкладке «Переменные» под именем «%s» (до выхода из игры; имя можно сменить щелчком)" % _nm) action Function(tm_scan_add, _p)
+                            textbutton "в мои статы" style "tm_btn" text_style "tm_btn_text" tooltip (u"Закрепить в «Мои статы» под именем «%s» (до выхода из игры; имя можно сменить щелчком)" % _nm) action Function(tm_scan_add, _p)
 

@@ -63,6 +63,27 @@ screen tm_field(field, w=300, n=30):
         action _iv.Enable()
         input value _iv style "tm_filter_text" length n copypaste True
 
+# боковые разделы вкладки: items — [(ключ, подпись, значок, счётчик)], field — поле tm_ui
+screen tm_sidenav(field, cur, items):
+    frame:
+        style "tm_side_frame"
+        xsize 210
+        yfill True
+        vbox:
+            spacing 4
+            for _k, _l, _ic, _b in items:
+                button:
+                    style "tm_side_btn"
+                    xfill True
+                    selected (cur == _k)
+                    action SetField(tm_ui, field, _k)
+                    hbox:
+                        spacing 8
+                        use tm_icon(_ic, 24)
+                        text _l style "tm_side_text" yalign 0.5
+                        if _b:
+                            text _b style "tm_dim" size 15 yalign 0.5
+
 screen tm_sep():
     frame:
         xfill True

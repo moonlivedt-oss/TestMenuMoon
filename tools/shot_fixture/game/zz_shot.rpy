@@ -1,7 +1,20 @@
 init 1000 python:
     import os, traceback
     ZZ_OUT = os.environ.get("ZZ_OUT", "shots")
-    zz_steps = ["dbg", "rewind", "stats", "scanner", "story", "settings", "diag", "help", "quit"]
+    zz_steps = ["dbg", "rewind", "stats", "stats_row", "scan", "story", "test", "test_cov", "test_scenes",
+                "settings", "settings_keys", "settings_tools", "diag", "help", "quit"]
+    # шаг -> (вкладка, поля tm_ui): раскрытая строка, «Найти переменную», разделы «Теста» и «Настроек»
+    ZZ_SET = {
+        "stats": ("stats", {"vals_mode": "stats", "row_open": "", "vals_tools": False}),
+        "stats_row": ("stats", {"row_open": "money", "vals_tools": True}),
+        "scan": ("stats", {"vals_mode": "scan", "row_open": "", "vals_tools": False}),
+        "test": ("checklist", {"test_sec": "auto"}),
+        "test_cov": ("checklist", {"test_sec": "cov"}),
+        "test_scenes": ("checklist", {"test_sec": "scenes"}),
+        "settings": ("settings", {"set_sec": "look"}),
+        "settings_keys": ("settings", {"set_sec": "keys"}),
+        "settings_tools": ("settings", {"set_sec": "tools"}),
+    }
     zz_i = [0]
 
     def zz_dbg():
@@ -54,6 +67,11 @@ init 1000 python:
                 elif nxt == "help":
                     tm_ui.diag_open = False
                     tm_ui.help_open = True
+                elif nxt in ZZ_SET:
+                    tab, fields = ZZ_SET[nxt]
+                    tm_ui.tab = tab
+                    for k, v in fields.items():
+                        setattr(tm_ui, k, v)
                 else:
                     tm_ui.tab = nxt
         renpy.restart_interaction()

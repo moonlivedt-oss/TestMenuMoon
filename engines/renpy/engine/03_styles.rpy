@@ -9,7 +9,7 @@ style tm_border is default:
     background Frame(Solid(tm_accent), 0, 0)
 
 style tm_header_bg is default:
-    background Solid(tm_accent)
+    background Solid(TM_TOK["bg_card"])
 
 style tm_footer_bg is default:
     background Solid(TM_TOK["bg_window"])
@@ -35,12 +35,14 @@ style tm_btn is default:
     padding (14, 7)
     background Frame(Solid(TM_TOK["tint_2"]), 8, 8)
     hover_background Frame(Solid(tm_accent), 8, 8)
+    selected_background Frame(Solid(tm_accent), 8, 8)
 
 style tm_btn_text is default:
     font tm_font
     size 20
     color TM_TOK["text"]
     hover_color TM_TOK["on_accent"]
+    selected_color TM_TOK["on_accent"]
 
 style tm_pm_btn is default:
     xsize 44
@@ -58,16 +60,40 @@ style tm_pm_text is default:
     yalign 0.5
 
 style tm_head_btn is default:
-    padding (12, 6)
-    background Frame(Solid(TM_TOK["on_accent"] + "55"), 8, 8)
-    hover_background Frame(Solid(TM_TOK["on_accent"]), 8, 8)
+    padding (8, 4)
+    background Frame(Solid(TM_TOK["tint_2"]), 8, 8)
+    hover_background Frame(Solid(tm_accent), 8, 8)
 
 style tm_head_btn_text is default:
     font tm_font
     size 18
-    color TM_TOK["on_accent"]
-    hover_color TM_TOK["text_bright"]
+    color TM_TOK["text"]
+    hover_color TM_TOK["on_accent"]
     bold True
+
+# боковые разделы вкладок «Тест» и «Настройки»
+style tm_side_frame is default:
+    background Frame(Solid(TM_TOK["tint_1"]), 8, 8)
+    padding (8, 8)
+
+style tm_side_btn is default:
+    padding (12, 8)
+    background None
+    hover_background Frame(Solid(TM_TOK["tint_1"]), 8, 8)
+    selected_background Frame(Solid(TM_TOK["tint_3"]), 8, 8)
+
+style tm_side_text is default:
+    font tm_font
+    size 19
+    color TM_TOK["text_hint"]
+    hover_color TM_TOK["text_bright"]
+    selected_color TM_TOK["text_bright"]
+    selected_bold True
+
+# строка значения: рамка (подсветка — заморожено или раскрыто)
+style tm_row is default:
+    padding (8, 4)
+    background None
 
 style tm_label is default:
     font tm_font
@@ -129,7 +155,7 @@ style tm_filter_text is default:
 style tm_head_title is default:
     font tm_font
     size 23
-    color TM_TOK["on_accent"]
+    color TM_TOK["text_bright"]
     bold True
 
 # Свой скроллбар для всех списков меню: со стилем игры он мог быть чужим, а в играх

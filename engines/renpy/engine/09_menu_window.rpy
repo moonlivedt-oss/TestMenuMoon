@@ -73,7 +73,7 @@ screen tm_menu():
                                             use tm_icon("logo", 34)
                                             # tm_q: «{» в заголовке игры иначе ломал текст-теги
                                             text tm_q(tm_title) style "tm_head_title" yalign 0.5
-                                            text tm_engine_tag() style "tm_head_btn_text" color (TM_TOK["on_accent"] + "99") bold False yalign 0.5
+                                            text tm_engine_tag() style "tm_head_btn_text" color TM_TOK["text_hint"] bold False yalign 0.5
                                         hbox:
                                             spacing 8
                                             xalign 1.0
@@ -87,13 +87,20 @@ screen tm_menu():
                                                     add tm_ic("question") zoom 0.45 align (0.5, 0.5)
                                                 else:
                                                     text "?" style "tm_head_btn_text"
-                                            textbutton "в центр":
-                                                style "tm_head_btn" text_style "tm_head_btn_text"
+                                            button:
+                                                style "tm_head_btn"
+                                                padding (6, 3)
                                                 tooltip "Вернуть окно в центр экрана"
                                                 action Function(tm_reset_pos)
-                                            textbutton "свернуть":
+                                                if tm_ic("target"):
+                                                    add tm_ic("target") zoom 0.45 align (0.5, 0.5)
+                                                else:
+                                                    text "+" style "tm_head_btn_text"
+                                            textbutton "—":
                                                 style "tm_head_btn" text_style "tm_head_btn_text"
-                                                tooltip "Мини-режим: плашка с откатом, слотом 1, скипом и HUD поверх игры — с ней можно играть"
+                                                xminimum 42
+                                                text_xalign 0.5
+                                                tooltip "Свернуть в мини-плашку: откат, слот 1, скип и HUD поверх игры — с ней можно играть"
                                                 action Function(tm_minimize)
                                             button:
                                                 style "tm_head_btn"
@@ -136,12 +143,10 @@ screen tm_menu():
 
                                 if tm_ui.tab == "rewind":
                                     use tm_tab_rewind
-                                elif tm_ui.tab == "stats":
-                                    use tm_tab_stats
+                                elif tm_ui.tab in ("stats", "scanner"):
+                                    use tm_tab_values
                                 elif tm_ui.tab == "actions":
                                     use tm_tab_actions
-                                elif tm_ui.tab == "scanner":
-                                    use tm_tab_scanner
                                 elif tm_ui.tab == "story":
                                     use tm_tab_story
                                 elif tm_ui.tab == "checklist":
