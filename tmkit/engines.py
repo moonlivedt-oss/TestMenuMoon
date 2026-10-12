@@ -128,7 +128,19 @@ def _web_detect(path):
     for sub in ("", "www", "package.nw", "app"):
         if os.path.isfile(os.path.join(path, sub, "index.html")):
             return True
-    return bool(glob.glob(os.path.join(glob.escape(path), "*.html")))
+    if glob.glob(os.path.join(glob.escape(path), "*.html")):
+        return True
+    # nw.js-игра с упакованным package.nw (zip): inject распакует при установке
+    pkg = os.path.join(path, "package.nw")
+    if os.path.isfile(pkg):
+        try:
+            import zipfile
+
+            with zipfile.ZipFile(pkg) as z:
+                return "index.html" in z.namelist()
+        except (OSError, zipfile.BadZipFile):
+            return False
+    return False
 
 
 WEB = Engine(

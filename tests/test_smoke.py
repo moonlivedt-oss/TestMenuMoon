@@ -2488,5 +2488,79 @@ def test_unreal_deploy_remove_and_anticheat_guard():
             assert "античит" in str(ex)
 
 
+# --------------------------------------------------------------- правки 2026-10-12 (обзор)
+
+
+def test_saves_renpy_py2_old_class_written_with_obj():
+    """Объект старого класса py2 (INST в сейве) пишется обратно через OBJ, а не NEWOBJ:
+    у классов без object в py2 нет __new__, и Ren'Py не загрузил бы такой сейв."""
+    import io as _io, pickletools as _pt
+    from tmkit import saves
+
+    data = b"(istore\nOldGirl\n(dp0\nS'love'\np1\nI3\nsb."
+    o = saves._Unpickler(_io.BytesIO(data), encoding="bytes").load()
+    assert o.__dict__.get("_tm_old") is True
+    added = saves._register_stubs()
+    try:
+        buf = _io.BytesIO()
+        saves._Pickler(buf, protocol=2).dump(o)
+    finally:
+        for mn in added:
+            sys.modules.pop(mn, None)
+    ops = [op.name for op, _a, _p in _pt.genops(buf.getvalue())]
+    assert "OBJ" in ops and "NEWOBJ" not in ops, ops
+
+
+def test_saves_coerce_keeps_big_ints():
+    from tmkit import saves
+
+    assert saves.coerce(1, "12345678901234567891") == 12345678901234567891
+    assert saves.coerce(1, "1 000") == 1000 and saves.coerce(1, "2,7") == 2
+    assert saves.coerce(1.0, "2,5") == 2.5 and saves.coerce(True, "нет") is False
+
+
+class _Cp932Info(__import__("zipfile").ZipInfo):
+    """Запись zip с именем в cp932 без флага UTF-8 — как у архиваторов японских игр."""
+
+    def _encodeFilenameFlags(self):
+        return self.filename.encode("cp932"), self.flag_bits & ~0x800
+
+
+def test_rpgmaker_unpack_keeps_japanese_names():
+    import zipfile
+
+    ri = engines._load_inject("rpgmaker")
+    with tempfile.TemporaryDirectory() as tmp:
+        pkg = os.path.join(tmp, "package.nw")
+        with zipfile.ZipFile(pkg, "w") as z:
+            z.writestr("index.html", "<html><body></body></html>")
+            z.writestr("js/plugins.js", _MV_PLUGINS)
+            z.writestr("js/rpg_core.js", "")
+            z.writestr("data/System.json", "{}")
+            z.writestr(_Cp932Info("img/pictures/立ち絵.png"), b"png")
+        ri.deploy_file(tmp)
+        assert os.path.isfile(os.path.join(pkg, "img", "pictures", "立ち絵.png"))
+        assert os.path.isfile(os.path.join(pkg, "js", "plugins", "TM_Menu.js"))
+
+
+def test_web_unpacks_packed_nwjs_game():
+    import zipfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        pkg = os.path.join(tmp, "package.nw")
+        with zipfile.ZipFile(pkg, "w") as z:
+            z.writestr("package.json", '{"main":"index.html"}')
+            z.writestr("index.html", "<html><body><canvas></canvas></body></html>")
+            z.writestr("c2runtime.js", "")
+        open(os.path.join(tmp, "Game.exe"), "w").close()
+        eng = engines.detect_engine(tmp)
+        assert eng is not None and eng.key == "web", eng
+        msg = eng.deploy(tmp)
+        assert "package.nw" in msg and zipfile.is_zipfile(pkg + ".tm_bak")
+        assert eng.installed(tmp) and eng.current(tmp)
+        eng.uninstall(tmp)
+        assert not eng.installed(tmp) and os.path.isdir(pkg)
+
+
 if __name__ == "__main__":
     sys.exit(_run())

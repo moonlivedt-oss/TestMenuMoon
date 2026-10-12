@@ -10,6 +10,7 @@ import struct
 MAGIC = b"GDPC"
 FLAG_ENCRYPTED_DIR = 1
 FLAG_REL_FILEBASE = 2
+FLAG_FILE_REMOVAL = 2  # флаг записи каталога (Godot 4.4+), не пакета
 
 
 class PckError(Exception):
@@ -46,6 +47,8 @@ class Pck:
                 ofs, size = struct.unpack("<QQ", f.read(16))
                 f.read(16)  # md5
                 fl = struct.unpack("<I", f.read(4))[0] if fmt >= 2 else 0
+                if fl & FLAG_FILE_REMOVAL:
+                    continue  # патч-пакет: запись «файл удалён», данных нет
                 if not name.startswith("res://"):
                     name = "res://" + name
                 self.files[name] = (

@@ -4,6 +4,7 @@
 Тот же блок <script> перед </body>, что и у Twine (engines/twine/inject.py), но
 с адаптером engines/web/tm_menu.js и своими маркерами. Цель — папка игры
 (index.html в приоритете) или сам .html. Оригинал HTML один раз копируется в .tm_bak.
+Упакованный package.nw (zip рядом с .exe nw.js) сначала распаковывается в папку.
 
 Использование:
     python inject.py <папка или .html>            внедрить/обновить меню
@@ -47,8 +48,25 @@ MARK_START, MARK_END = _B.MARK_START, _B.MARK_END
 inject, remove = _B.inject, _B.remove
 
 
+def _rpgm():
+    # распаковка package.nw (zip рядом с .exe nw.js) — та же, что у RPG Maker
+    path = os.path.join(HERE, "..", "rpgmaker", "inject.py")
+    spec = importlib.util.spec_from_file_location("tm_web_rpgm_inject", path)
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
 def deploy_file(path):
-    return _B.deploy_file(path)
+    note = ""
+    if os.path.isdir(path):
+        try:
+            target_html(path)
+        except FileNotFoundError:
+            # nw.js-игра с упакованным package.nw: распаковать, архив — в package.nw.tm_bak
+            if _rpgm().unpack_package(path):
+                note = " (package.nw распакован, архив: package.nw.tm_bak)"
+    return _B.deploy_file(path) + note
 
 
 def remove_file(path):

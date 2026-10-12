@@ -189,6 +189,8 @@ def _unhide(d):
 
 
 def _rehide(paths):
+    if not paths:
+        return
     import ctypes
 
     k32 = ctypes.windll.kernel32
@@ -231,7 +233,8 @@ def _deploy(d):
     _copy_tree(os.path.join(EXPLORER, "plugins"), d, "BepInEx/plugins", added)
     menu = os.path.join(d, "BepInEx", "plugins", "TestMenu")
     os.makedirs(menu, exist_ok=True)
-    if os.path.exists(MENU_DLL):
+    has_menu = os.path.exists(MENU_DLL)
+    if has_menu:
         shutil.copy2(MENU_DLL, os.path.join(menu, "TestMenu.Unity.dll"))
         added.append("BepInEx/plugins/TestMenu/TestMenu.Unity.dll")
     sys.path.insert(0, os.path.join(ROOT, "engines", "godot"))
@@ -243,6 +246,13 @@ def _deploy(d):
     with open(os.path.join(d, LIST), "w", encoding="utf-8") as f:
         f.write("\n".join(sorted(set(added))) + "\n")
     v = unity_version(d) or "?"
+    if not has_menu:
+        # свежий клон: плагин не собран — ставим только BepInEx + UnityExplorer и говорим об этом
+        return (
+            f"{d}: BepInEx + UnityExplorer установлены (Unity {v}), но своего меню нет — "
+            "не собран engines/unity/plugin (dotnet build -c Release), потом переустанови. "
+            "В игре: F7 — UnityExplorer"
+        )
     return (
         f"{d}: меню + BepInEx + UnityExplorer установлены (Unity {v}). Первый запуск долгий "
         "(BepInEx готовит библиотеки). В игре: Shift+T / F9 — меню, F7 — UnityExplorer"

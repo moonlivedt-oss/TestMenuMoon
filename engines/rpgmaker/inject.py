@@ -113,6 +113,21 @@ def packed_package(path):
     return p if os.path.isfile(p) and zipfile.is_zipfile(p) else None
 
 
+def _zip_name(info):
+    """Имя файла в архиве. Без флага UTF-8 zipfile читает имя как cp437, а архиваторы
+    японских игр пишут cp932 (или UTF-8 без флага) — тогда ресурсы распаковывались
+    с кракозябрами в именах, и игра их не находила."""
+    if info.flag_bits & 0x800:
+        return info.filename
+    raw = info.filename.encode("cp437")
+    for enc in ("utf-8", "cp932"):
+        try:
+            return raw.decode(enc)
+        except UnicodeDecodeError:
+            pass
+    return info.filename
+
+
 def unpack_package(path):
     """package.nw (zip) -> папка package.nw; архив остаётся как package.nw.tm_bak."""
     pkg = packed_package(path)
@@ -125,12 +140,20 @@ def unpack_package(path):
     try:
         with zipfile.ZipFile(bak) as z:
             dest = os.path.abspath(pkg)
-            for name in z.namelist():  # без выхода за пределы папки (../)
+            entries = [(_zip_name(i), i) for i in z.infolist()]
+            for name, _i in entries:  # без выхода за пределы папки (../)
                 if not os.path.abspath(os.path.join(dest, name)).startswith(
                     dest + os.sep
                 ):
                     raise ValueError(f"подозрительный путь в архиве: {name}")
-            z.extractall(pkg)
+            for name, info in entries:
+                out = os.path.join(dest, name)
+                if name.endswith(("/", "\\")):
+                    os.makedirs(out, exist_ok=True)
+                    continue
+                os.makedirs(os.path.dirname(out), exist_ok=True)
+                with z.open(info) as src, open(out, "wb") as dst:
+                    shutil.copyfileobj(src, dst)
     except Exception:
         shutil.rmtree(pkg, ignore_errors=True)
         os.replace(bak, pkg)

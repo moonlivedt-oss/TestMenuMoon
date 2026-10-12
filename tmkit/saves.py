@@ -99,7 +99,11 @@ def coerce(old, text):
             return False
         raise ValueError("нужно true / false")
     if isinstance(old, int):
-        return int(float(str(text).replace(",", ".")))
+        t = str(text).strip().replace(" ", "")
+        try:
+            return int(t)  # без float: большие числа (деньги, счётчики) не теряют разряды
+        except ValueError:
+            return int(float(t.replace(",", ".")))
     if isinstance(old, float):
         return float(str(text).replace(",", "."))
     if isinstance(old, bytes):
@@ -473,6 +477,7 @@ def _stub(module, name):
             "__reduce_ex__": __reduce_ex__,
             "__module__": module,
             "__qualname__": name,
+            "_tm_stub": True,  # метка для _Unpickler._old / _Pickler.save (старые классы py2)
         },
     )
     if base is dict:

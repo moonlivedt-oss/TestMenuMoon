@@ -1155,7 +1155,9 @@ class Studio(QMainWindow):
             return
         if args is None:  # exe/html — через ассоциацию ОС
             try:
-                os.startfile(program)
+                # рабочая папка — папка игры: иначе игра стартовала в папке студии, и те,
+                # что читают ресурсы по относительным путям, падали или не находили сейвы
+                os.startfile(program, cwd=os.path.dirname(os.path.abspath(program)))
                 self._log_line(f"$ запуск game_{i}: {program}")
             except Exception as e:
                 self._log_line(f"! запуск game_{i}: {e}")

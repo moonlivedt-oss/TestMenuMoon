@@ -121,7 +121,7 @@ def cmd_uninstall(args):
 
 def cmd_quick(args):
     """Меню в любую игру по пути — без манифеста. Движок определяется сам:
-    Ren'Py, Godot 4, Unity (BepInEx), RPG Maker MV/MZ, Twine."""
+    Ren'Py, Godot 4, Unity (BepInEx), Unreal (UE4SS), RPG Maker MV/MZ, Twine, HTML5."""
     from tmkit import engines as _engines
 
     failed = 0
@@ -134,8 +134,8 @@ def cmd_quick(args):
                 if "Shift+T" not in msg:
                     msg += f"  (в игре: {_engines.HOTKEYS.get(eng.key, 'Shift+T')})"
             print(f"[OK] {eng.title}: {msg}")
-        except (OSError, ValueError, FileNotFoundError) as e:
-            print(f"[X] {e}")
+        except Exception as e:  # одна сломанная игра не обрывает установку в остальные
+            print(f"[X] {path}: {e}")
             failed += 1
     return 1 if failed else 0
 
@@ -300,9 +300,10 @@ def build_parser():
 
     sp = sub.add_parser(
         "quick",
-        help="поставить меню в ЛЮБУЮ Ren'Py-игру по пути, без манифеста (авто-статы)",
+        help="поставить меню в любую игру по пути, без манифеста (движок определяется сам)",
         description="поставить (или --remove — снять) меню в игре по пути: папка игры, "
-        "её game/ или .exe. Статы движок находит сам.",
+        "её game/, .exe или .html. Движок (Ren'Py, RPG Maker, HTML5, Twine, Godot, Unity, "
+        "Unreal) определяется сам, статы меню находит само.",
     )
     sp.add_argument("paths", nargs="+", metavar="PATH", help="путь к игре")
     sp.add_argument("--remove", action="store_true", help="снять меню вместо установки")

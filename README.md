@@ -112,7 +112,8 @@ python tm.py quick --remove "C:/Games/SomeGame"
 **HTML5.** Переменные ищутся в рантайме: глобальные переменные Construct 2, переменные игры и
 сцены GDevelop, `registry` и `data` сцен Phaser 3, в остальных играх — глобалы страницы и их поля
 на 3 уровня. Скорость игры — подменой времени (`performance.now`, `Date.now`,
-`requestAnimationFrame`).
+`requestAnimationFrame`). Упакованный `package.nw` у nw.js-игр распаковывается в папку (архив
+остаётся рядом как `package.nw.tm_bak`).
 
 **Godot 4.** Меню на GDScript подключается автозагрузкой из `override.cfg` (игра и `.pck` не
 меняются): глобальные объекты, переменные Dialogic и сцены `.dtl` с условиями, разблокировки,
