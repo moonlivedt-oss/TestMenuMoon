@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Плагин BepInEx 6 (Unity IL2CPP). Ссылки — tools/unity/refs: BepInEx core + interop-сборки
+       Unity, которые BepInEx создаёт при первом запуске игры (см. engines/unity/README.md). -->
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <AssemblyName>TestMenu.Unity</AssemblyName>
+    <RootNamespace>TestMenu</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <NoWarn>CS0618;CS8632</NoWarn>
+    <RefDir>$(MSBuildThisFileDirectory)..\..\..\tools\unity\refs</RefDir>
+    <OutputPath>$(MSBuildThisFileDirectory)bin\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="$(RefDir)\*.dll">
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+</Project>

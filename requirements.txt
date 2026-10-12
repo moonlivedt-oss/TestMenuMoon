@@ -1,0 +1,8 @@
+# Зависимости тулкита TestMenuMoon.
+#
+# Только для GUI-студии (studio.py). Скрипты пайплайна (collect_sources / curate_dump /
+# gen_data / deploy / verify / uninstall) и тесты (test_smoke.py) — на чистой стандартной
+# библиотеке, без внешних пакетов. Декомпилятор unrpyc вендорится в ./unrpyc.
+#
+#   pip install -r requirements.txt
+PyQt6>=6.5

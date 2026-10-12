@@ -1,0 +1,1 @@
+{"width":30,"height":20,"events":[null,{"id":1,"name":"Сундук","x":7,"y":5,"pages":[{"conditions":{"switch1Valid":false,"switch1Id":1,"switch2Valid":false,"switch2Id":1,"variableValid":true,"variableId":1,"variableValue":3},"list":[{"code":111,"parameters":[0,2,0]},{"code":121,"parameters":[2,2,1]},{"code":0,"parameters":[]}]}]}]}

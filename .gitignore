@@ -1,0 +1,43 @@
+# байткод / кэш
+__pycache__/
+*.py[cod]
+
+# сгенерированные data-файлы (пересобираются gen_data.py)
+/build/
+
+# скриншоты из движка
+tm_shot_*.png
+
+# превью-макет генератора UI-рамок (сами тайлы assets/tm_ui/*.png — коммитим)
+assets/tm_ui/_mockup.png
+
+# вендоренный декомпилятор со своей git-историей (клонируется отдельно)
+/unrpyc/
+
+# рабочая зона анализа обычно вне репозитория (D:/_ta), но на всякий случай:
+/_ta/
+
+# прошлая версия манифеста (manifest.save_games) и его временный файл
+/tmkit/games_data.py.bak
+/tmkit/games_data.py.tmp
+
+# кэши линтера и тестов, бэкапы внедрения в HTML
+.ruff_cache/
+.pytest_cache/
+*.tm_bak
+
+# инструменты Unity (tools/fetch_unity_tools.py скачивает их заново)
+/tools/unity/
+
+# сборка плагина Unity (dotnet build -c Release в engines/unity/plugin)
+/engines/unity/plugin/bin/
+/engines/unity/plugin/obj/
+
+# личное: свой манифест игр (свежий клон получает копию tmkit/games_example.py),
+# архив старых игр, твики под конкретные игры, рабочие заметки
+/tmkit/games_data.py
+/tmkit/games_archive.py
+/tmkit/archive_data/
+/tweaks/game_*.rpy
+/AUDIT_AND_PLAN.md
+/TOKEN_ECONOMY.txt

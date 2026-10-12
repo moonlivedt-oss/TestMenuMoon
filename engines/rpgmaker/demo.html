@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>TEST MENU | RPG Maker PoC — демо</title>
+  <style>
+    body { font-family: Segoe UI, system-ui, sans-serif; background:#12141a; color:#e8eaee; margin:0; padding:40px; }
+    .card { max-width:560px; margin:0 auto; background:#0f1219; border:1px solid #23262f; border-radius:12px; padding:24px 28px; }
+    h1 { color:#ff9f43; margin-top:0; }
+    code { background:#0a0c11; padding:2px 6px; border-radius:5px; }
+    kbd { background:#1b1f29; border:1px solid #2b2f3a; border-radius:5px; padding:2px 7px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>RPG Maker PoC — демо</h1>
+    <p>Заглушка рантайма RPG Maker (<code>$gameVariables</code>, <code>$gameSwitches</code>,
+       <code>$gameParty</code>, <code>$dataSystem</code>). Нажми <kbd>Shift</kbd>+<kbd>T</kbd> —
+       меню правит золото, переменные и переключатели. <kbd>Esc</kbd> — закрыть.</p>
+    <p id="dump"></p>
+  </div>
+
+  <!-- заглушка RPG Maker (в реальной игре это уже есть) -->
+  <script>
+    window.$dataSystem = {
+      variables: [null, "Прогресс квеста", "Репутация", "", "Дней прошло"],
+      switches:  [null, "Пролог пройден", "Секретная дверь"]
+    };
+    window.$gameVariables = { _d: {1: 5, 2: 10, 4: 3},
+      value: function (i) { return this._d[i] || 0; },
+      setValue: function (i, v) { this._d[i] = v; } };
+    window.$gameSwitches = { _d: {1: true, 2: false},
+      value: function (i) { return !!this._d[i]; },
+      setValue: function (i, v) { this._d[i] = v; } };
+    window.$gameParty = { _g: 250,
+      gold: function () { return this._g; },
+      gainGold: function (n) { this._g += n; },
+      loseGold: function (n) { this._g = Math.max(0, this._g - n); } };
+
+    // заглушки классов движка: отряд, карта, сцены (для вкладки «Игра»)
+    window.$dataMapInfos = [null, { id: 1, name: "Деревня" }, { id: 2, name: "Подземелье" }];
+    window.$dataSystem.startMapId = 1; $dataSystem.startX = 5; $dataSystem.startY = 7;
+    window.$dataCommonEvents = [null, { name: "Новый день", trigger: 0, switchId: 1, list: [{ code: 122, parameters: [4, 4, 1, 0, 1] }] }];
+    window.TextManager = { param: function (i) { return ["Макс. HP", "Макс. MP", "Атака", "Защита", "М. атака", "М. защита", "Ловкость", "Удача"][i]; } };
+    function Game_Player() {} Game_Player.prototype.isDebugThrough = function () { return false; };
+    Game_Player.prototype.canEncounter = function () { return true; };
+    function Game_Actor(n) { this._n = n; this.hp = 120; this.mp = 30; this.tp = 0; this.level = 4; this._exp = 300; this._p = [150, 40, 18, 14, 9, 11, 12, 6]; }
+    Game_Actor.prototype.name = function () { return this._n; };
+    Game_Actor.prototype.setHp = function (v) { this.hp = Math.max(0, v); };
+    Game_Actor.prototype.setMp = function (v) { this.mp = v; }; Game_Actor.prototype.setTp = function (v) { this.tp = v; };
+    Game_Actor.prototype.changeLevel = function (v) { this.level = v; };
+    Game_Actor.prototype.currentExp = function () { return this._exp; }; Game_Actor.prototype.changeExp = function (v) { this._exp = v; };
+    Game_Actor.prototype.param = function (i) { return this._p[i]; }; Game_Actor.prototype.addParam = function (i, d) { this._p[i] += d; };
+    Game_Actor.prototype.addState = function () {}; Game_Actor.prototype.deathStateId = function () { return 1; };
+    Game_Actor.prototype.skillMpCost = function () { return 5; }; Game_Actor.prototype.skillTpCost = function () { return 0; };
+    Game_Actor.prototype.finalExpRate = function () { return 1; };
+    var heroes = [new Game_Actor("Харольд"), new Game_Actor("Тереза")];
+    $gameParty.members = function () { return heroes; };
+    $gameParty.inBattle = function () { return false; };
+    window.$gamePlayer = { x: 5, y: 7, direction: function () { return 2; },
+      reserveTransfer: function (m, x, y) { $gameMap._id = m; this.x = x; this.y = y; } };
+    window.$gameMap = { _id: 1, mapId: function () { return this._id; } };
+    window.SceneManager = { _deltaTime: 1 / 60, _accumulator: 0 };
+
+    function dump() {
+      document.getElementById("dump").textContent =
+        "золото=" + $gameParty.gold() + " | var1=" + $gameVariables.value(1) +
+        " | switch1=" + $gameSwitches.value(1) +
+        " | карта " + $gameMap.mapId() + " (" + $gamePlayer.x + ", " + $gamePlayer.y + ")";
+    }
+    dump(); setInterval(dump, 500);
+  </script>
+
+  <!-- в реальной игре inject.py склеивает адаптер + ядро в один <script>;
+       здесь грузим по отдельности: сначала адаптер (задаёт TM_ADAPTER), потом ядро -->
+  <script src="tm_menu.js"></script>
+  <script src="../_shared/tm_menu_core.js"></script>
+</body>
+</html>

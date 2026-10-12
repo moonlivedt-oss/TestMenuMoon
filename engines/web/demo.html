@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>TEST MENU | HTML5 — демо</title>
+  <style>
+    body { font-family: Segoe UI, system-ui, sans-serif; background:#12141a; color:#e8eaee; margin:0; padding:32px; }
+    .card { max-width:620px; margin:0 auto; background:#0f1219; border:1px solid #23262f; border-radius:12px; padding:22px 26px; }
+    h1 { color:#7cc4ff; margin-top:0; }
+    canvas { background:#0a0c11; border-radius:8px; display:block; margin:12px 0; }
+    kbd { background:#1b1f29; border:1px solid #2b2f3a; border-radius:5px; padding:2px 7px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>HTML5 — демо</h1>
+    <p>Самодельная «игра»: шарик летает (скорость — по <code>requestAnimationFrame</code>),
+       таймер копит очки. <kbd>Shift</kbd>+<kbd>T</kbd> — меню: «Значения» находят
+       <code>game.player</code> сами, «Игра» — скорость и пауза.</p>
+    <canvas id="c" width="560" height="140"></canvas>
+    <p id="dump"></p>
+  </div>
+  <script>
+    // «игра»: глобальный объект состояния, как у большинства самописных HTML5-игр
+    var game = { player: { name: "Hero", hp: 80, maxHp: 100, gold: 25, level: 3, alive: true },
+                 world: { wave: 1, enemies: 4 }, score: 0 };
+    var debugMode = false;
+    // заглушка Construct 2: глобальные переменные проекта
+    var c2vars = [{ name: "Coins", data: 7 }, { name: "Stage", data: 2 }, { name: "Nickname", data: "Moon" }];
+    function cr_getC2Runtime() { return { all_global_vars: c2vars }; }
+
+    var x = 20, dir = 1, last = null, acc = 0;
+    var ctx = document.getElementById("c").getContext("2d");
+    function frame(t) {
+      if (last === null) last = t;
+      var dt = (t - last) / 1000; last = t;
+      x += dir * 160 * dt; if (x > 540 || x < 20) dir = -dir;
+      acc += dt; while (acc >= 1) { acc -= 1; game.score += 10; }
+      ctx.clearRect(0, 0, 560, 140);
+      ctx.fillStyle = "#7cc4ff"; ctx.beginPath(); ctx.arc(x, 70, 16, 0, 7); ctx.fill();
+      document.getElementById("dump").textContent = "очки=" + game.score + " | hp=" + game.player.hp + " | золото=" + game.player.gold + " | Coins=" + c2vars[0].data;
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  </script>
+
+  <!-- в игре inject.py склеивает значки + адаптер + ядро в один <script> -->
+  <script src="tm_menu.js"></script>
+  <script src="../_shared/tm_menu_core.js"></script>
+</body>
+</html>
