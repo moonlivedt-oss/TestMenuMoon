@@ -1,5 +1,12 @@
 # Test Menu Moon
 
+[![tests](https://github.com/moonlivedt-oss/TestMenuMoon/actions/workflows/tests.yml/badge.svg)](https://github.com/moonlivedt-oss/TestMenuMoon/actions/workflows/tests.yml)
+![Windows](https://img.shields.io/badge/Windows-10%20%2F%2011-0078D6)
+![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776AB?logo=python&logoColor=white)
+![License](https://img.shields.io/badge/license-MIT-green)
+
+![Test Menu Moon](docs/cover.webp)
+
 Тест-меню и читы для игр любого жанра. Ставится в игру одной кнопкой, открывается в игре
 по **Shift+T** (запасная — **F9**): правка переменных, заморозка, поиск значений как в ArtMoney,
 скорость игры, телепорт, подсказки к выборам, авто-прохождение для тестеров. Плюс студия на
@@ -185,6 +192,7 @@ engines/                       меню и установщики: _shared (ве
 tweaks/                        твики игр (пример — example_debug.rpy)
 tools/                         загрузка инструментов Unity/Unreal, генераторы UI и значков, фикстуры
 tests/test_smoke.py            тесты без зависимостей:  python tests/test_smoke.py
+docs/                          обложка и скриншоты для README
 ```
 
 ## Тесты
@@ -206,3 +214,4 @@ LZString с эталоном), веб-ядро, движок Ren'Py. Тесты 
 
 [MIT](LICENSE). Скриншоты в `docs/screenshots` сняты на тестовых играх; фон и персонаж в них —
 из демо-игры The Question (Ren'Py SDK) и под лицензию проекта не попадают.
+Обложка `docs/cover.webp` — из [библиотеки картинок](https://github.com/moonlivedt-oss/photosMOONprojects).
