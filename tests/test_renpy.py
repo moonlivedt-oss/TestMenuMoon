@@ -962,3 +962,23 @@ def test_engine_has_change_journal():
     for key in ("def _tm_log_tick", "_tm_log_tick()", "screen tm_log_popup", 'u"заморозка"',
                 "== Журнал изменений", "self.changelog = []"):
         assert key in eng, key
+
+
+def test_renpy_menu_english_is_complete_and_fresh():
+    """Каждая русская строка меню Ren'Py есть в lang_en.json, у перевода те же подстановки,
+    а 13_lang.rpy собран из текущего JSON (python tools/gen_renpy_lang.py)."""
+    import importlib.util
+    import re
+
+    spec = importlib.util.spec_from_file_location("gen_lang", os.path.join(ROOT, "tools", "gen_renpy_lang.py"))
+    g = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(g)
+    assert g.missing() == [], g.missing()[:10]
+    d = json.load(open(g.SRC, encoding="utf-8"))
+    ph = re.compile(r"%[sdr%]|\[\[|\[[^\[\]]+\]")
+    bad = [k for k, v in d.items() if sorted(ph.findall(k)) != sorted(ph.findall(v))]
+    assert not bad, bad[:10]
+    rows = "".join("        %s: %s,\n" % (g.py_str(k), g.py_str(v)) for k, v in d.items())
+    want = (g.HEAD + rows + g.TAIL).replace("\r\n", "\n")
+    got = open(g.OUT, encoding="utf-8").read().replace("\r\n", "\n")
+    assert got == want, "13_lang.rpy устарел: python tools/gen_renpy_lang.py"

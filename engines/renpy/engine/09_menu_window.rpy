@@ -156,7 +156,7 @@ screen tm_menu():
                                 if _tip:
                                     text tm_q(_tip) style "tm_tip"
                                 else:
-                                    text (tm_keys_text() + "  меню    Shift+H  подсказки    Shift+B  баг    Ctrl+Z  отмена    Esc  закрыть    Ctrl  скип") style "tm_foot"
+                                    text (tm_keys_text() + tm_tr(u"  меню    Shift+H  подсказки    Shift+B  баг    Ctrl+Z  отмена    Esc  закрыть    Ctrl  скип")) style "tm_foot"
 
     # ---------- попапы ----------
     if tm_ui.edit:

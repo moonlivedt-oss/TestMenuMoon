@@ -322,7 +322,10 @@ init -4 python:
         return out
 
     def tm_word(tok):
-        # перевод токена: точное слово, затем самое длинное слово-префикс (>= 4 букв, см. TM_INFLECT)
+        # перевод токена: точное слово, затем самое длинное слово-префикс (>= 4 букв, см. TM_INFLECT).
+        # Меню на английском (13_lang.rpy) — слова имени остаются как есть: alice_love -> «Alice | Love»
+        if tm_lang() == "en":
+            return None
         w = TM_WORDS.get(tok)
         if w:
             return w
@@ -457,27 +460,27 @@ init -4 python:
         # -> (короткая строка под именем, полный текст для подсказки)
         u = tm_usage(path)
         if not u or not (u["nchg"] or u["nchk"]):
-            s = u"в сценарии не меняется и не проверяется"
+            s = tm_tr(u"в сценарии не меняется и не проверяется")
             return s, s
         short, full = [], []
         if u["chg"]:
             ex = sorted(u["chg"], key=lambda c: not c[2].startswith(u"«"))
             parts = [u"%s%s %s" % (_TM_OPS.get(op, op), e, w) for op, e, w in ex[:2]]
             more = u["nchg"] - len(parts)
-            short.append(u"меняется: " + u", ".join(parts) + (u" и ещё %d" % more if more > 0 else u""))
-            full.append(u"Меняется в %d местах: " % u["nchg"]
+            short.append(tm_tr(u"меняется: ") + u", ".join(parts) + (tm_tr(u" и ещё %d") % more if more > 0 else u""))
+            full.append(tm_tr(u"Меняется в %d местах: ") % u["nchg"]
                         + u"; ".join(u"%s%s %s" % (_TM_OPS.get(op, op), e, w) for op, e, w in ex[:6]))
         need = [(op, num, w) for op, num, w in u["chk"] if num is not None]
         if need:
             need.sort(key=lambda c: c[1])
             fmt = lambda c: u"%s %s → %s" % (c[0].replace(">=", u"≥").replace("<=", u"≤"),
                                               int(c[1]) if c[1] == int(c[1]) else c[1], c[2])
-            short.append(u"нужно " + fmt(need[0]))
-            full.append(u"Проверяется: " + u"; ".join(fmt(c) for c in need[:6]))
+            short.append(tm_tr(u"нужно ") + fmt(need[0]))
+            full.append(tm_tr(u"Проверяется: ") + u"; ".join(fmt(c) for c in need[:6]))
         elif u["nchk"]:
             w = u["chk"][0][2]
-            short.append(u"проверяется" + (u": " + w if w else u""))
-            full.append(u"Проверяется в %d условиях" % u["nchk"] + (u", например " + w if w else u""))
+            short.append(tm_tr(u"проверяется") + (u": " + w if w else u""))
+            full.append(tm_tr(u"Проверяется в %d условиях") % u["nchk"] + (tm_tr(u", например ") + w if w else u""))
         return u"; ".join(short), u". ".join(full)
 
     def tm_score(kind, path):

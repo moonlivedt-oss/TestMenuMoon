@@ -532,7 +532,7 @@ init -5 python:
         for g in people + [g for g in fixed if g in groups]:
             items = sorted(groups[g], key=lambda x: (-x[0], tm_nice(x[1], x[2])[0].lower()))
             key = "svc" if g == u"Служебное" else ""
-            rows.append((u"%s  %d" % (g, len(items)), "", key))
+            rows.append((u"%s  %d" % (tm_tr(g), len(items)), "", key))
             rows.extend((lab, path, key) for _s, lab, path in items)
         renpy.session["tm_auto"] = rows
         return rows

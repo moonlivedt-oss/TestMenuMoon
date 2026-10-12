@@ -349,6 +349,20 @@ screen tm_tab_settings():
                 use tmtr_settings
                 use tm_sep
 
+            # ---- Язык меню ----
+            hbox:
+                spacing 12
+                text "Язык меню" style "tm_label" yalign 0.5 min_width 220
+                textbutton "Русский":
+                    style "tm_btn" text_style "tm_btn_text"
+                    selected tm_lang() != "en"
+                    action Function(tm_set_lang, "ru")
+                textbutton "English":
+                    style "tm_btn" text_style "tm_btn_text"
+                    selected tm_lang() == "en"
+                    action Function(tm_set_lang, "en")
+            use tm_sep
+
             # ---- Пульт в студии ----
             hbox:
                 spacing 10
