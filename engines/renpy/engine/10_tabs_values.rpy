@@ -139,7 +139,7 @@ screen tm_tab_stats():
             hbox:
                 spacing 10
                 yalign 0.5
-                text "Переменные" style "tm_h" yalign 0.5
+                text "Значения" style "tm_h" yalign 0.5
                 null width 6
                 # источник: data-файл игры или авто-поиск (переключатель — только если data есть)
                 if getattr(store, "tm_stats", None):
@@ -346,7 +346,7 @@ screen tm_tab_actions():
                 spacing 10
                 yalign 0.5
                 use tm_icon("coins", 32)
-                text "Выдать" style "tm_h" yalign 0.5
+                text "Выдача" style "tm_h" yalign 0.5
             if tm_actions:
                 hbox:
                     spacing 10

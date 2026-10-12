@@ -6,7 +6,7 @@
 
 import os, sys, re, html, traceback
 
-from PyQt6.QtCore import Qt, QProcess, QProcessEnvironment, QSettings, QSize, QThread, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, QEvent, QProcess, QProcessEnvironment, QSettings, QSize, QThread, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QIcon, QPixmap, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QPushButton,
@@ -34,14 +34,14 @@ from tmkit import engines  # авто-определение движка -> а�
 from tmkit import analysis  # разбор строк кандидатов -> пары для таблицы статов
 from tmkit import deploy as tmdeploy  # статус установки: нет / устарело / актуально
 from tmkit import generate
-from tmkit.paths import CAND_DIR, FROZEN, ana_dir
+from tmkit.paths import CAND_DIR, FROZEN, GAMES_DATA_PATH, ana_dir
 from tmkit import naming  # понятные имена переменных (словарь — из движка)
 
 from tmstudio import ROOT, tour
 from tmstudio.tokens import TOK
 from tmstudio.theme import (
     ACCENT, DIRTY_MARK, ENGINE_BADGE, ICON_DIR, ICON_PATH, QSS,
-    add_shadow, faded_icon, ibtn, icon, mascot_box,
+    add_shadow, faded_icon, ibtn, icon, mascot_box, short_title,
 )
 from tmstudio.tabs import OverviewTab, TableTab, CandidatesTab
 
@@ -87,6 +87,10 @@ class Studio(QMainWindow):
         QShortcut(QKeySequence.StandardKey.Save, self).activated.connect(
             self._save_manifest
         )
+        # список игр правят и руками (games_data.py): F5 — перечитать, а при возврате в окно
+        # студия сама замечает изменения на диске (отдельной кнопки больше нет)
+        QShortcut(QKeySequence("F5"), self).activated.connect(self._reload_from_disk)
+        self._manifest_mtime = self._manifest_mtime_now()
         self._reload_list()
         if self.games:
             self.list.setCurrentRow(0)
@@ -137,13 +141,10 @@ class Studio(QMainWindow):
         tv.setSpacing(0)
         title = QLabel("Test Menu Studio")
         title.setObjectName("h1")
-        sub = QLabel("тулкит тест-меню | мульти-движок")
-        sub.setObjectName("sub")
         tv.addWidget(title)
-        tv.addWidget(sub)
         head.addLayout(tv)
         head.addStretch(1)
-        self.b_tour = ibtn("Обучение", "question", "Пошаговый тур по студии")
+        self.b_tour = ibtn("Тур", "question", "Пошаговый тур по студии")
         self.b_tour.clicked.connect(self.start_tour)
         head.addWidget(self.b_tour, 0, Qt.AlignmentFlag.AlignTop)
         lv.addLayout(head)
@@ -167,9 +168,9 @@ class Studio(QMainWindow):
         ub.addWidget(b_hide)
         self.update_bar.hide()
         lv.addWidget(self.update_bar)
-        lv.addWidget(QLabel("ИГРЫ ИЗ МАНИФЕСТА", objectName="section"))
+        lv.addWidget(QLabel("МОИ ИГРЫ", objectName="section"))
         self.list_filter = QLineEdit()
-        self.list_filter.setPlaceholderText("фильтр игр…")
+        self.list_filter.setPlaceholderText("Поиск игры")
         self.list_filter.setClearButtonEnabled(True)
         self.list_filter.textChanged.connect(self._filter_list)
         lv.addWidget(self.list_filter)
@@ -177,16 +178,16 @@ class Studio(QMainWindow):
         self.list.currentRowChanged.connect(self._on_select)
         lv.addWidget(self.list, 1)
         self.list_empty = mascot_box(
-            "m_wave", "Игр пока нет. «Добавить» — игра в манифест, или быстрая установка ниже."
+            "m_wave", "Игр пока нет. «Добавить» — выбрать папку игры, или «Быстрая установка» ниже."
         )
         self.list_empty.hide()
         lv.addWidget(self.list_empty)
 
         mb = QHBoxLayout()
-        b_add = ibtn("Добавить", "plus", "Добавить игру в манифест (выбрать папку game/)")
+        b_add = ibtn("Добавить", "plus", "Добавить игру в список (выбрать папку игры)")
         self.b_add_game = b_add
         b_add.clicked.connect(self._add_game)
-        b_rem = ibtn("Убрать", "trash", "Убрать выбранную игру из манифеста (файлы игры не трогаются)")
+        b_rem = ibtn("Убрать", "trash", "Убрать выбранную игру из списка (файлы игры не трогаются)")
         b_rem.setObjectName("danger")
         b_rem.clicked.connect(self._remove_game)
         mb.addWidget(b_add)
@@ -194,10 +195,10 @@ class Studio(QMainWindow):
         mb.addStretch(1)
         lv.addLayout(mb)
 
-        b_quick = ibtn("Быстрая установка в любую игру…", "download")
+        b_quick = ibtn("Быстрая установка…", "download")
         self.b_quick = b_quick
         b_quick.setToolTip(
-            "Поставить меню в игру Ren'Py без манифеста и пайплайна: только движок.\n"
+            "Поставить меню в любую игру Ren'Py без настройки и без добавления в список.\n"
             "Статы меню найдёт само (режим «авто»), подсказки к выборам и сканер тоже работают."
         )
         b_quick.clicked.connect(self._quick_install)
@@ -223,16 +224,13 @@ class Studio(QMainWindow):
         lv.addWidget(b_saves)
 
         gb = QHBoxLayout()
-        self.b_all_dep = ibtn("Разложить всё", "upload")
+        self.b_all_dep = ibtn("Применить во всех", "upload", "Сохранить правки и поставить или обновить меню во всех играх списка")
         self.b_all_dep.setObjectName("primary")
         self.b_all_dep.clicked.connect(self._deploy_all)
-        self.b_all_ver = ibtn("Проверить всё", "checklist", "Lint всех игр Ren'Py из манифеста")
+        self.b_all_ver = ibtn("Проверить всё", "checklist", "Проверка (lint) всех игр Ren'Py из списка")
         self.b_all_ver.clicked.connect(lambda: self._enqueue("verify"))
-        b_reload = ibtn("", "back", "Перечитать манифест с диска")
-        b_reload.clicked.connect(self._reload_from_disk)
         gb.addWidget(self.b_all_dep)
         gb.addWidget(self.b_all_ver)
-        gb.addWidget(b_reload)
         lv.addLayout(gb)
         top.addWidget(left)
 
@@ -249,18 +247,18 @@ class Studio(QMainWindow):
             default_accent=self.accent,
         )
         self.stats_tab = TableTab(
-            ["Метка", "Путь (пусто = заголовок секции)", "min", "max"],
-            "путь резолвится на store игры",
+            ["Название", "Где лежит (пусто — заголовок группы)", "мин", "макс"],
+            "где лежит значение в игре, например mc.money",
             self._mark_dirty,
         )
         self.actions_tab = TableTab(
-            ["Метка", "Код (пусто = заголовок секции)"],
-            "код исполняется в пространстве игры",
+            ["Название", "Код (пусто — заголовок группы)"],
+            "код выполняется внутри игры, например mc.money += 1000",
             self._mark_dirty,
         )
         self.cand_tab = CandidatesTab(
-            f"{CAND_DIR}/game_N.txt — подсказки: пути статов, инвентарь. "
-            "После «//» — понятное имя (с пометкой «догадка», если только по названию)",
+            f"Найденные переменные игры (файл {CAND_DIR}/game_N.txt). "
+            "После «//» — понятное имя, «догадка» — если только по названию",
             on_collect=lambda: self._enqueue_current("collect"),
             on_curate=self._run_curate,
             on_refresh=self._load_cand,
@@ -270,10 +268,10 @@ class Studio(QMainWindow):
 
         self.tabs = QTabWidget()
         self.tabs.setIconSize(QSize(20, 20))
-        self.tabs.addTab(self.overview, icon("house"), "Обзор")
-        self.tabs.addTab(self.stats_tab, icon("stats"), "Характеристики")
-        self.tabs.addTab(self.actions_tab, icon("actions"), "Действия")
-        self.tabs.addTab(self.cand_tab, icon("scanner"), "Кандидаты")
+        self.tabs.addTab(self.overview, icon("house"), "Основное")
+        self.tabs.addTab(self.stats_tab, icon("stats"), "Статы")
+        self.tabs.addTab(self.actions_tab, icon("actions"), "Выдача")
+        self.tabs.addTab(self.cand_tab, icon("scanner"), "Поиск переменных")
         top.addWidget(self.tabs)
         top.setStretchFactor(0, 0)
         top.setStretchFactor(1, 1)
@@ -285,7 +283,7 @@ class Studio(QMainWindow):
         lgl = QVBoxLayout(logw)
         lgl.setContentsMargins(0, 6, 0, 0)
         lh = QHBoxLayout()
-        lh.addWidget(QLabel("ЛОГ", objectName="section"))
+        lh.addWidget(QLabel("ЖУРНАЛ", objectName="section"))
         lh.addStretch(1)
         self.b_stop = ibtn("Стоп", "close", px=16)
         self.b_stop.setObjectName("danger")
@@ -324,21 +322,22 @@ class Studio(QMainWindow):
             installed = st != "none"
             n_stat = len([s for s in g.get("stats", []) if s[1]])
             n_act = len([a for a in g.get("actions", []) if a[1]])
-            bits = [ENGINE_BADGE.get(eng.key, eng.key) if eng else "?"]
+            bits = [ENGINE_BADGE.get(eng.key, eng.key) if eng else "движок не распознан"]
             if n_stat:
-                bits.append(f"статы:{n_stat}")
+                bits.append(f"статы: {n_stat}")
             if n_act:
-                bits.append(f"выдача:{n_act}")
-            extra = "  | " + " | ".join(bits)
+                bits.append(f"выдача: {n_act}")
             mark = DIRTY_MARK if i in self._dirty_ids else ""
-            it = QListWidgetItem(f"game_{i} — {g.get('title', '')}{extra}{mark}")
+            # две строки: название (без «TEST MENU |») и движок со счётчиками
+            it = QListWidgetItem(f"{short_title(g.get('title', ''))}\n{', '.join(bits)}{mark}")
             it.setIcon(
                 icon("ok") if st == "ok" else icon("warn") if st == "stale" else faded_icon("ok")
             )
             it.setToolTip(
-                {"ok": "Меню установлено, версия актуальная",
-                 "stale": "Меню устарело — «Сохранить и разложить»",
-                 "none": "Меню не установлено"}[st]
+                f"game_{i}  {root}\n"
+                + {"ok": "Меню стоит, версия свежая",
+                   "stale": "Меню устарело — «Применить в игре»",
+                   "none": "Меню не установлено"}[st]
             )
             it.setData(Qt.ItemDataRole.UserRole, i)
             it.setForeground(QColor(TOK["text"] if installed else TOK["text_hint"]))
@@ -452,9 +451,9 @@ class Studio(QMainWindow):
 
     def _status_text(self, i):
         return {
-            "ok": "да, актуальная версия",
-            "stale": "устарело — нажми «Сохранить и разложить»",
-            "none": "нет — нажми «Сохранить и разложить»",
+            "ok": "стоит, свежая версия",
+            "stale": "устарело — нажми «Применить в игре»",
+            "none": "не стоит — нажми «Применить в игре»",
         }[self._status(i)]
 
     def _installed_with(self, eng, root):
@@ -495,8 +494,9 @@ class Studio(QMainWindow):
     def _save_manifest(self):
         self._flush_ui_to_model()
         manifest.save_games(self.games, self.G, self.accent)
+        self._manifest_mtime = self._manifest_mtime_now()
         self._clear_dirty()
-        self._log_line("$ манифест сохранён -> tmkit/games_data.py")
+        self._log_line("$ список игр сохранён (tmkit/games_data.py)")
         self._reload_list()
         if self.cur is not None:
             self.overview.set_installed(self._status_text(self.cur))
@@ -534,7 +534,10 @@ class Studio(QMainWindow):
             return
         if (
             QMessageBox.question(
-                self, "Удалить меню", f"Удалить тест-меню из game_{self.cur}?"
+                self,
+                "Удалить меню",
+                f"Удалить меню из «{short_title(self.games[self.cur].get('title', ''))}»?\n\n"
+                "Файлы самой игры не трогаются.",
             )
             != QMessageBox.StandardButton.Yes
         ):
@@ -615,11 +618,11 @@ class Studio(QMainWindow):
         actions = self.actions_tab.read()
         issues = validate.check_game(stats, actions, self.overview.read()[2])
         if not issues:
-            QMessageBox.information(self, "Проверка данных", "Проблем не найдено ✓")
+            QMessageBox.information(self, "Проверка", "Данные меню в порядке.")
         else:
             QMessageBox.warning(
                 self,
-                "Проверка данных",
+                "Проверка",
                 "Найдено проблем: %d\n\n%s" % (len(issues), "\n".join(issues)),
             )
         self._log_line(
@@ -649,7 +652,7 @@ class Studio(QMainWindow):
             self._log_line(f"! понятные имена: {e}")
         n = self.stats_tab.add_pairs(pairs)
         self._log_line(
-            f"$ в Характеристики game_{self.cur}: добавлено {n}, уже было {len(pairs) - n}"
+            f"$ в статы game_{self.cur}: добавлено {n}, уже было {len(pairs) - n}"
         )
 
     def _run_engine_scan(self, eng):
@@ -685,11 +688,11 @@ class Studio(QMainWindow):
         if syntax:
             QMessageBox.critical(
                 self,
-                "Пайплайн отменён",
+                "Отменено",
                 "Синтаксические ошибки в действиях:\n\n" + "\n".join(syntax),
             )
             self._log_line(
-                "$ пайплайн отменён: синтаксис в действиях (%d)" % len(syntax)
+                "$ отменено: ошибка в коде выдачи (%d)" % len(syntax)
             )
             return
         if issues:
@@ -740,7 +743,7 @@ class Studio(QMainWindow):
             else:
                 msg = (
                     "Файла кандидатов ещё нет.\n"
-                    "Нажми «1. Распаковать исходники», затем «2. Найти кандидатов»."
+                    "Нажми «1. Распаковать игру», затем «2. Найти переменные»."
                 )
             self.cand_tab.set_text(msg, empty=True)
 
@@ -758,6 +761,7 @@ class Studio(QMainWindow):
         disk, G, acc = manifest.load_games()
         res = change(disk)
         manifest.save_games(disk, G, acc)
+        self._manifest_mtime = self._manifest_mtime_now()
         change(self.games)
         return res
 
@@ -850,7 +854,7 @@ class Studio(QMainWindow):
             if (
                 QMessageBox.question(
                     self,
-                    "Игра уже в манифесте",
+                    "Игра уже в списке",
                     f"Эта папка уже добавлена как game_{dup}.\n\nДобавить второй раз?",
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                     QMessageBox.StandardButton.No,
@@ -897,7 +901,7 @@ class Studio(QMainWindow):
                 self,
                 "Готово",
                 f"Меню установлено:\n{root}\n\nСтаты найдутся автоматически.\n"
-                "Добавить игру и в манифест (чтобы задать свои статы/действия)?",
+                "Добавить игру и в список студии (чтобы задать свои статы и выдачу)?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
@@ -919,9 +923,9 @@ class Studio(QMainWindow):
         if (
             QMessageBox.question(
                 self,
-                "Убрать из манифеста",
-                f"Убрать game_{idx} — «{title}» — из манифеста?\n\n"
-                "Файлы игры и build/ не затрагиваются; удаляется только запись.\n"
+                "Убрать из списка",
+                f"Убрать «{short_title(title)}» из списка?\n\n"
+                "Файлы игры не затрагиваются, удаляется только запись в студии.\n"
                 "Чтобы снести само меню из игры — используй «Удалить меню».",
             )
             != QMessageBox.StandardButton.Yes
@@ -933,7 +937,7 @@ class Studio(QMainWindow):
         self._dirty_ids.discard(idx)
         if not self._dirty_ids:
             self._clear_dirty()
-        self._log_line(f"$ game_{idx} убрана из манифеста")
+        self._log_line(f"$ game_{idx} убрана из списка")
         self._reload_list()
         if self.games:
             self.list.setCurrentRow(0)
@@ -949,12 +953,40 @@ class Studio(QMainWindow):
             != QMessageBox.StandardButton.Yes
         ):
             return
+        keep = self.cur
         self.games, self.G, self.accent = manifest.load_games()
+        self._manifest_mtime = self._manifest_mtime_now()
         self._clear_dirty()
         self.cur = None
         self._reload_list()
-        if self.games:
+        if keep in self.games:
+            self._select_index(keep)
+        elif self.games:
             self.list.setCurrentRow(0)
+
+    @staticmethod
+    def _manifest_mtime_now():
+        try:
+            return os.path.getmtime(GAMES_DATA_PATH)
+        except OSError:
+            return None
+
+    def changeEvent(self, e):
+        super().changeEvent(e)
+        if e.type() == QEvent.Type.ActivationChange and self.isActiveWindow():
+            self._manifest_changed_on_disk()
+
+    def _manifest_changed_on_disk(self):
+        """Список игр изменили вне студии: без своих правок — перечитать молча, иначе — сказать."""
+        m = self._manifest_mtime_now()
+        if m is None or m == getattr(self, "_manifest_mtime", m):
+            return
+        if self._dirty:
+            self._manifest_mtime = m  # не напоминать на каждом возврате в окно
+            self._log_line("! список игр изменён на диске, а здесь есть несохранённые правки: F5 — перечитать")
+            return
+        self._reload_from_disk()
+        self._log_line("$ список игр изменён на диске — перечитан")
 
     # ------------------------------------------------------------ QProcess
     def _enqueue(self, script, *args):

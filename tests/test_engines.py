@@ -255,7 +255,7 @@ def test_engine_menu_core_has_scanner_and_actions():
     core = open(
         os.path.join(ROOT, "engines", "_shared", "tm_menu_core.js"), encoding="utf-8"
     ).read()
-    assert "Сканер" in core and "Экшены" in core and "scanNarrow" in core
+    assert 'T("Поиск")' in core and 'T("Выдача")' in core and "scanNarrow" in core
     assert "tm-finput" in core and "applyFilter" in core  # фильтр по имени
     assert "localStorage" in core  # запоминание состояния
 

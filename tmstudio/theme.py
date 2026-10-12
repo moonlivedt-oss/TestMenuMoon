@@ -202,6 +202,14 @@ def mascot_box(name, text):
 DIRTY_MARK = "  (не сохранено)"
 
 
+def short_title(title):
+    """Название игры для списка: без служебного «TEST MENU |» в начале."""
+    t = (title or "").strip()
+    if t.upper().startswith("TEST MENU"):
+        t = t[len("TEST MENU"):].lstrip(" |:—-")
+    return t or "без названия"
+
+
 def hline():
     f = QFrame()
     f.setFrameShape(QFrame.Shape.HLine)

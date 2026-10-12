@@ -85,8 +85,8 @@ python tm.py library "C:/Games"                   # every game in a folder: engi
 python tm.py library "C:/Games" --install         # install where missing or outdated
 ```
 
-On first start the studio shows a tour (repeat it with the "Обучение" button). In the game, the
-question mark button in the menu header opens "How to use the menu".
+On first start the studio shows a tour (repeat it with the "Тур" button). In the game, the
+question mark button in the menu header (or F1) opens "How to use the menu" with all keys.
 
 Mod loaders for Unity, Unreal and GameMaker are downloaded once: `python tools/fetch_unity_tools.py`
 (BepInEx 5/6, UnityExplorer, UE4SS, UndertaleModTool CLI, AssetRipper, Cpp2IL into `tools/unity/`,
@@ -138,7 +138,7 @@ strings exactly.
 **RPG Maker MV/MZ.** "Values": gold, variables and switches (with a **"where"** button: which events
 on which maps change and check them), items, the party (level, HP/MP/TP, EXP, parameters). "Game":
 speed (pause … ×5), modes: through walls, no random battles, party immortality, free skills,
-EXP ×10, click to teleport; a map list with jumps; teleport points; profile. "Actions": win the
+EXP ×10, click to teleport; a map list with jumps; teleport points; profile. "Give": win the
 battle, escape, save anywhere, teleport by map ID and coordinates.
 
 **HTML5.** Variables are found at runtime: Construct 2 global variables, Construct 3 global and
@@ -151,7 +151,7 @@ nw.js games is unpacked into a folder (the archive stays as `package.nw.tm_bak`)
 
 **Shared by the web menus** (HTML5, RPG Maker, Twine). "Game": **frame step** while paused
 (exactly 1/60 s of game time; for RPG Maker one scene update), **FPS in the corner**, the remote,
-the menu language. "Saves": `localStorage` keys and IndexedDB records (localforage and others);
+the menu language. "Saves" (Сохранения): `localStorage` keys and IndexedDB records (localforage and others);
 JSON and LZString-compressed data (RPG Maker MV in a browser, SugarCube) are unfolded into a list
 of fields, edited by input or toggle, then "Write edits". The original of a key is kept before the
 first write: "Restore original". "Values": a change log (who changed it: the game, the menu, a

@@ -1,7 +1,7 @@
 /* ============================================================================
  *  UNIVERSAL TEST MENU — общий UI-ядро (движко-независимое).
  *  Читает window.TM_ADAPTER (задаётся адаптером конкретного движка) и рисует
- *  оверлей: вкладки Значения / Игра / Сканер / Сейвы / Экшены, перетаскивание, тосты.
+ *  оверлей: вкладки Значения / Игра / Поиск / Сохранения / Выдача, перетаскивание, тосты.
  *
  *  Контракт адаптера TM_ADAPTER:
  *    accent   : "#rrggbb"
@@ -276,7 +276,6 @@
       "#tm-head{background:linear-gradient(135deg," + ACCENT + "," + ACCENT + "d0);color:" + K.on_accent + ";",
       "padding:14px 16px;display:flex;gap:12px;align-items:center;cursor:move;user-select:none;",
       "box-shadow:inset 0 1px 0 rgba(255,255,255,.28)}",
-      "#tm-head .dot{flex:none;margin-right:30px;width:9px;height:9px;border-radius:50%;background:" + K.on_accent + "66;box-shadow:15px 0 0 " + K.on_accent + "40,30px 0 0 " + K.on_accent + "26}",
       "#tm-head .t{flex:1;font-weight:800;font-size:16px;letter-spacing:.3px}",
       "#tm-head .t small{display:block;font-weight:600;font-size:11px;opacity:.68;letter-spacing:.2px}",
       "#tm-head button{background:" + K.on_accent + "26;color:" + K.on_accent + ";border:0;border-radius:9px;width:32px;height:29px;",
@@ -615,7 +614,7 @@
     }
   }
 
-  // ------------------------------------------------------------------ вкладка «Сейвы»
+  // ------------------------------------------------------------------ вкладка «Сохранения»
   // Сохранения HTML5-игр почти всегда в localStorage (RPG Maker в браузере, SugarCube,
   // свои движки) или в IndexedDB (localforage, Construct, GDevelop). Здесь их видно и можно
   // править: JSON и сжатое LZString разворачиваются в список полей. Перед первой записью
@@ -939,14 +938,13 @@
     winEl = el("div"); winEl.id = "tm-win";
 
     var head = el("div"); head.id = "tm-head";
-    head.appendChild(el("span", "dot"));
     var t = el("div", "t"); t.innerHTML = "TEST MENU<small>" + T(A.title || "") + "</small>"; head.appendChild(t);
     mkBtn(head, "X", close).title = T("Закрыть");
     winEl.appendChild(head);
     enableDrag(head);
 
     var tabs = el("div"); tabs.id = "tm-tabs";
-    [["vals", T("Значения")], ["game", T("Игра")], ["scan", T("Сканер")], ["saves", T("Сейвы")], ["act", T("Экшены")]].forEach(function (d) {
+    [["vals", T("Значения")], ["game", T("Игра")], ["scan", T("Поиск")], ["saves", T("Сохранения")], ["act", T("Выдача")]].forEach(function (d) {
       if (d[0] === "game" && !hasGameTab()) return;
       var b = mkBtn(tabs, d[1], function () { tab = d[0]; Array.prototype.forEach.call(tabs.children, function (o) { o.className = ""; }); b.className = "on"; saveState(); rerender(); });
       if (d[0] === tab) b.className = "on";

@@ -14,6 +14,7 @@ screen tm_menu():
         key tm_alt_key() action SetField(tm_ui, "open", False)
     key "game_menu" action SetField(tm_ui, "open", False)
     key "ctrl_K_z" action Function(tm_undo)
+    key "K_F1" action SetField(tm_ui, "help_open", True)
     if tm_ui.tab == "stats":
         key "K_PAGEUP" action Function(tm_stat_page, -1)
         key "K_PAGEDOWN" action Function(tm_stat_page, 1)
@@ -80,7 +81,7 @@ screen tm_menu():
                                             button:
                                                 style "tm_head_btn"
                                                 padding (6, 3)
-                                                tooltip "Как пользоваться меню"
+                                                tooltip "Как пользоваться меню и все клавиши (F1)"
                                                 action SetField(tm_ui, "help_open", True)
                                                 if tm_ic("question"):
                                                     add tm_ic("question") zoom 0.45 align (0.5, 0.5)
@@ -156,7 +157,7 @@ screen tm_menu():
                                 if _tip:
                                     text tm_q(_tip) style "tm_tip"
                                 else:
-                                    text (tm_keys_text() + tm_tr(u"  меню    Shift+H  подсказки    Shift+B  баг    Ctrl+Z  отмена    Esc  закрыть    Ctrl  скип")) style "tm_foot"
+                                    text (tm_keys_text() + tm_tr(u"  меню    Esc  закрыть    F1  все клавиши")) style "tm_foot"
 
     # ---------- попапы ----------
     if tm_ui.edit:

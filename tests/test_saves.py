@@ -153,7 +153,7 @@ def test_saves_renpy_signed_persistent_refuses_without_key():
 
 def test_web_core_has_frame_step_fps_and_saves_tab():
     core = open(os.path.join(ROOT, "engines", "_shared", "tm_menu_core.js"), encoding="utf-8").read()
-    for key in ("function frameStep", "function setFps", "Шаг кадра", '["saves", T("Сейвы")]',
+    for key in ("function frameStep", "function setFps", "Шаг кадра", '["saves", T("Сохранения")]',
                 "function renderSaves", "decompressFromBase64", "indexedDB", "tm_bak:"):
         assert key in core, key
     rpgm = open(os.path.join(ROOT, "engines", "rpgmaker", "tm_menu.js"), encoding="utf-8").read()

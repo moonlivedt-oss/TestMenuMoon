@@ -1,4 +1,4 @@
-"""Вкладки карточки игры: «Обзор», таблицы «Характеристики» / «Действия», «Кандидаты».
+"""Вкладки карточки игры: «Основное», таблицы «Статы» / «Выдача», «Поиск переменных».
 
 Каждая вкладка — свой QWidget; окно (tmstudio.window.Studio) связывает их колбэками.
 """
@@ -51,42 +51,42 @@ class OverviewTab(QWidget):
         g.setContentsMargins(16, 16, 16, 16)
         g.setVerticalSpacing(10)
         r = 0
-        g.addWidget(QLabel("Заголовок меню"), r, 0)
+        g.addWidget(QLabel("Название в меню"), r, 0)
         self.ed_title = QLineEdit()
         self.ed_title.textEdited.connect(on_dirty)
         g.addWidget(self.ed_title, r, 1)
         r += 1
-        g.addWidget(QLabel("Статус / заметка"), r, 0)
+        g.addWidget(QLabel("Заметка"), r, 0)
         self.ed_status = QLineEdit()
         self.ed_status.textEdited.connect(on_dirty)
         g.addWidget(self.ed_status, r, 1)
         r += 1
-        g.addWidget(QLabel("Акцент"), r, 0)
+        g.addWidget(QLabel("Цвет меню"), r, 0)
         arow = QHBoxLayout()
         self.ed_accent = QLineEdit()
-        self.ed_accent.setPlaceholderText(f"{default_accent}  |  пусто = глобальный")
+        self.ed_accent.setPlaceholderText(f"как у всех игр ({default_accent})")
         self.ed_accent.textEdited.connect(on_dirty)
         self.ed_accent.textEdited.connect(lambda: self._update_swatch())
         self.sw_accent = QPushButton()
         self.sw_accent.setFixedSize(22, 22)
         self.sw_accent.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.sw_accent.setToolTip("Выбрать цвет акцента")
+        self.sw_accent.setToolTip("Выбрать цвет меню")
         self.sw_accent.clicked.connect(self._pick_color)
         arow.addWidget(self.ed_accent, 1)
         arow.addWidget(self.sw_accent)
         g.addLayout(arow, r, 1)
         r += 1
-        g.addWidget(QLabel("Папка game/"), r, 0)
+        g.addWidget(QLabel("Папка игры"), r, 0)
         self.lb_root = QLabel("—", objectName="dim")
         self.lb_root.setWordWrap(True)
         g.addWidget(self.lb_root, r, 1)
         r += 1
-        g.addWidget(QLabel("Лаунчер"), r, 0)
+        g.addWidget(QLabel("Запуск"), r, 0)
         self.lb_launcher = QLabel("—", objectName="dim")
         self.lb_launcher.setWordWrap(True)
         g.addWidget(self.lb_launcher, r, 1)
         r += 1
-        g.addWidget(QLabel("Установлено"), r, 0)
+        g.addWidget(QLabel("Меню в игре"), r, 0)
         self.lb_installed = QLabel("—", objectName="accent")
         g.addWidget(self.lb_installed, r, 1)
         r += 1
@@ -98,47 +98,52 @@ class OverviewTab(QWidget):
         r += 1
 
         row = QHBoxLayout()
-        b_save = ibtn("Сохранить и разложить", "upload")
+        # одна главная кнопка; «Сохранить» без установки — Ctrl+S (окно), отдельной кнопки нет
+        b_save = ibtn("Применить в игре", "upload", "Сохранить правки и поставить или обновить меню в игре")
         b_save.setObjectName("primary")
         self.b_save_deploy = b_save
         b_save.clicked.connect(on_save_deploy)
-        b_sav = ibtn("Сохранить", "save", "Только записать манифест, без раскладки (Ctrl+S)")
-        b_sav.clicked.connect(on_save)
-        b_chk = ibtn("Проверить данные", "checklist", "Офлайн: код действий, дубли, метки — без запуска игры")
-        b_chk.clicked.connect(on_validate)
-        b_ver = ibtn("Lint (Ren'Py)", "bug", "Проверка игры штатным lint Ren'Py")
-        b_ver.clicked.connect(on_verify)
-        self.b_ver = b_ver
-        self._renpy = True
-        b_run = ibtn("Запустить", "rocket", "Запустить игру (для проверки меню)")
+        b_run = ibtn("Запустить", "rocket", "Запустить игру, чтобы посмотреть меню")
         self.b_run = b_run
         b_run.clicked.connect(on_launch)
-        b_open = ibtn("Открыть папку", "load")
+        # одна проверка: данные меню без запуска игры, у Ren'Py ещё и lint самой игры
+        self._on_validate, self._on_verify = on_validate, on_verify
+        b_chk = ibtn("Проверить", "checklist")
+        b_chk.clicked.connect(self._check)
+        self.b_chk = b_chk
+        self._renpy = True
+        b_open = ibtn("Открыть папку", "load", "Открыть папку игры в проводнике")
         b_open.clicked.connect(on_open)
-        b_uni = ibtn("Удалить меню", "trash")
+        b_uni = ibtn("Удалить меню", "trash", "Убрать меню из игры (файлы самой игры не трогаются)")
         b_uni.setObjectName("danger")
         b_uni.clicked.connect(on_uninstall)
-        for b in (b_save, b_sav, b_chk, b_ver, b_run, b_open):
+        for b in (b_save, b_run, b_chk, b_open):
             row.addWidget(b)
         row.addStretch(1)
         row.addWidget(b_uni)
         g.addLayout(row, r, 0, 1, 2)
         r += 1
         g.setRowStretch(r, 1)
-        self.run_buttons = [b_save, b_ver, b_uni]
+        self.run_buttons = [b_save, b_chk, b_uni]
+        self.set_renpy(True)
+
+    def _check(self):
+        self._on_validate()
+        if self._renpy:
+            self._on_verify()
 
     def set_busy(self, busy):
         self._busy = busy
         for b in self.run_buttons:
             b.setEnabled(not busy)
-        self.b_ver.setEnabled(not busy and self._renpy)
 
     def set_renpy(self, renpy):
         """Lint — только для Ren'Py: у Twine/RPG Maker verify падал с ошибкой."""
         self._renpy = renpy
-        self.b_ver.setEnabled(renpy and not getattr(self, "_busy", False))
-        self.b_ver.setToolTip(
-            "Проверка игры штатным lint Ren'Py" if renpy else "Lint есть только у игр Ren'Py"
+        self.b_chk.setToolTip(
+            "Проверить данные меню и прогнать проверку самой игры (lint Ren'Py)"
+            if renpy
+            else "Проверить данные меню: код выдачи, повторы, группы"
         )
 
     def load(
@@ -183,7 +188,7 @@ class OverviewTab(QWidget):
 
 # ================================================ вкладка: таблица (статы/действия)
 class TableTab(QWidget):
-    """Редактор пар «метка / значение» (одинаков для Характеристик и Действий)."""
+    """Редактор пар «метка / значение» (одинаков для Статов и Выдачи)."""
 
     def __init__(self, headers, section_label, on_dirty):
         super().__init__()
@@ -352,16 +357,16 @@ class CandidatesTab(QWidget):
         v = QVBoxLayout(self)
         v.setContentsMargins(14, 14, 14, 14)
         row = QHBoxLayout()
-        self.b_col = ibtn("1. Распаковать исходники", "puzzle")
+        self.b_col = ibtn("1. Распаковать игру", "puzzle")
         self.b_col.clicked.connect(on_collect)
-        self.b_cur = ibtn("2. Найти кандидатов", "scanner")
+        self.b_cur = ibtn("2. Найти переменные", "scanner")
         self.b_cur.clicked.connect(on_curate)
-        b_ref = ibtn("Обновить просмотр", "back")
+        b_ref = ibtn("Обновить", "back")
         b_ref.clicked.connect(on_refresh)
-        self.b_full = ibtn("Весь пайплайн", "rocket")
+        self.b_full = ibtn("Всё сразу", "rocket")
         self.b_full.setObjectName("primary")
         self.b_full.setToolTip(
-            "Распаковать → кандидаты → сгенерировать → разложить (по очереди)"
+            "Распаковать игру, найти переменные, собрать и поставить меню (по очереди)"
         )
         self.b_full.clicked.connect(on_full)
         row.addWidget(self.b_col)
@@ -374,10 +379,10 @@ class CandidatesTab(QWidget):
         v.addWidget(self.hint)
         frow = QHBoxLayout()
         self.ed_filter = QLineEdit()
-        self.ed_filter.setPlaceholderText("фильтр строк…  (заголовки секций остаются)")
+        self.ed_filter.setPlaceholderText("Фильтр строк (заголовки групп остаются)")
         self.ed_filter.setClearButtonEnabled(True)
         self.ed_filter.textChanged.connect(lambda _t: self._render())
-        self.b_add = ibtn("в Характеристики", "stats")
+        self.b_add = ibtn("В статы", "stats")
         self.b_add.setToolTip(
             "Добавить выделенные строки (или строку под курсором) в таблицу статов"
         )
@@ -400,7 +405,7 @@ class CandidatesTab(QWidget):
         прячем Ren'Py-only кнопки, «Найти кандидатов» становится «Сканировать данные»."""
         self.b_col.setVisible(renpy)
         self.b_full.setVisible(renpy)
-        self.b_cur.setText("2. Найти кандидатов" if renpy else "Сканировать данные")
+        self.b_cur.setText("2. Найти переменные" if renpy else "Найти переменные")
         self.b_add.setVisible(
             renpy
         )  # таблица статов есть только у манифестных (Ren'Py) игр
