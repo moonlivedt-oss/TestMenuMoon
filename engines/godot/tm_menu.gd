@@ -52,6 +52,10 @@ var speed_label: Label     # значок темпа в углу, пока он 
 var show_fps = false       # счётчик FPS в углу экрана
 var fps_label: Label
 var places = []            # точки телепорта игрока: {"name", "scene", "pos"}
+var fly_on = false         # полёт: игра не двигает героя, его двигают стрелки (Shift — быстрее)
+var noclip_on = false      # сквозь стены: слои столкновений героя обнулены
+var _fly_node = null
+var _saved_layers = {}     # узел -> [collision_layer, collision_mask] до «сквозь стены»
 
 var _usage = null           # смысл переменных по сценам Dialogic (кэш)
 var _chars = null           # персонажи Dialogic: ключ -> имя
@@ -1110,6 +1114,17 @@ func _tab_game() -> void:
 	if p == null:
 		body.add_child(_label("Игрок не найден: нет узла в группе player и узла Player / Hero в текущей сцене.", 15, DIM))
 		return
+	var rf = _row()
+	var fl = _button("Полёт: вкл" if fly_on else "Полёт: выкл", func(): _set_fly(not fly_on); refresh(), "",
+			"Игра перестаёт двигать героя (его _physics_process выключен): стрелки — движение, Shift — быстрее, в 3D PageUp / PageDown — высота")
+	if fly_on:
+		fl.add_theme_color_override("font_color", ACCENT)
+	rf.add_child(fl)
+	var nc = _button("Сквозь стены: вкл" if noclip_on else "Сквозь стены: выкл", func(): _set_noclip(not noclip_on); refresh(), "",
+			"Слои столкновений героя обнуляются: стены и враги его не задевают")
+	if noclip_on:
+		nc.add_theme_color_override("font_color", ACCENT)
+	rf.add_child(nc)
 	var r2 = _row()
 	var l = _label("%s: %s" % [p.name, str(p.global_position)], 16)
 	l.custom_minimum_size = Vector2(460, 0)
@@ -1123,6 +1138,51 @@ func _tab_game() -> void:
 		rr.add_child(pn)
 		rr.add_child(_button("сюда", func(): _teleport(pl)))
 		rr.add_child(_button("×", func(): places.remove_at(i); refresh()))
+
+
+# ------------------------------------------------------------------ полёт и сквозь стены
+func _set_fly(on: bool) -> void:
+	var p = _player()
+	if p == null:
+		return
+	if not on and is_instance_valid(_fly_node):
+		_fly_node.set_physics_process(true)
+	fly_on = on
+	_fly_node = p if on else null
+	if on:
+		p.set_physics_process(false)
+		if p is CharacterBody2D or p is CharacterBody3D:
+			p.velocity = p.velocity * 0
+
+
+func _fly_step(p, delta: float) -> void:
+	# реальное время кадра: на паузе темпа (time_scale 0) лететь всё равно можно
+	var dt = delta / Engine.time_scale if Engine.time_scale > 0.0 else 1.0 / 60.0
+	var d = Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
+	var fast = Input.is_key_pressed(KEY_SHIFT)
+	if p is Node2D:
+		p.global_position += d * (900.0 if fast else 320.0) * dt
+	elif p is Node3D:
+		var up = (1.0 if Input.is_key_pressed(KEY_PAGEUP) else 0.0) - (1.0 if Input.is_key_pressed(KEY_PAGEDOWN) else 0.0)
+		p.global_position += Vector3(d.x, up, d.y) * (18.0 if fast else 6.0) * dt
+
+
+func _set_noclip(on: bool) -> void:
+	var p = _player()
+	if p == null:
+		return
+	noclip_on = on
+	if not (p is CollisionObject2D or p is CollisionObject3D):
+		return
+	if on:
+		if not _saved_layers.has(p):
+			_saved_layers[p] = [p.collision_layer, p.collision_mask]
+		p.collision_layer = 0
+		p.collision_mask = 0
+	elif _saved_layers.has(p):
+		p.collision_layer = _saved_layers[p][0]
+		p.collision_mask = _saved_layers[p][1]
+		_saved_layers.erase(p)
 
 
 # ------------------------------------------------------------------ профиль игры
@@ -1232,7 +1292,9 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	if fly_on and is_instance_valid(_fly_node) and not opened:
+		_fly_step(_fly_node, delta)
 	if show_fps and fps_label != null:
 		fps_label.text = "FPS %d" % Engine.get_frames_per_second()
 	for p in frozen:

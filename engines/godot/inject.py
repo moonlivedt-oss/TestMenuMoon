@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Поставить/снять тест-меню в игре на Godot 4 — без перепаковки .pck.
+"""Поставить/снять тест-меню в игре на Godot 4 или 3 — без перепаковки .pck.
 
 Godot при старте читает override.cfg рядом с .exe. Туда добавляется автозагрузка
 TestMenu с абсолютным путём к tm_godot/tm_menu.gd (относительный путь Godot считает от
@@ -29,7 +29,8 @@ import tm_load  # noqa: E402
 tm_load.use_tmkit()
 pckmod = tm_load.load("godot", "pck.py")
 
-MENU_SRC = os.path.join(HERE, "tm_menu.gd")
+MENU_SRC = os.path.join(HERE, "tm_menu.gd")  # Godot 4 (GDScript 2)
+MENU_SRC3 = os.path.join(HERE, "tm_menu3.gd")  # Godot 3 (GDScript 1), меню попроще
 ICONS_SRC = os.path.join(ROOT, "assets", "tm_ui", "ic")
 DIRNAME = "tm_godot"
 CFG = "override.cfg"
@@ -56,6 +57,11 @@ def godot_version(path):
         return pckmod.Pck(pckmod.find_pack(game_dir(path))).version
     except (pckmod.PckError, ValueError, OSError):
         return None
+
+
+def menu_src(version):
+    """Исходник меню под версию движка: Godot 3 — своё меню на GDScript 1."""
+    return MENU_SRC3 if version and version[0] == 3 else MENU_SRC
 
 
 def _words_json():
@@ -93,11 +99,11 @@ def _add_autoload(text, entry):
 def deploy_file(path):
     d = game_dir(path)
     v = godot_version(d)
-    if v and v[0] < 4:
-        raise ValueError(f"Godot {'.'.join(map(str, v))}: меню пока только для Godot 4")
+    if v and v[0] < 3:
+        raise ValueError(f"Godot {'.'.join(map(str, v))}: меню есть для Godot 3 и 4")
     out = os.path.join(d, DIRNAME)
     os.makedirs(os.path.join(out, "ic"), exist_ok=True)
-    shutil.copy2(MENU_SRC, os.path.join(out, "tm_menu.gd"))
+    shutil.copy2(menu_src(v), os.path.join(out, "tm_menu.gd"))
     with open(os.path.join(out, "tm_words.json"), "w", encoding="utf-8") as f:
         f.write(_words_json())
     if os.path.isdir(ICONS_SRC):
@@ -162,7 +168,7 @@ def is_current(path):
                 return False
         with (
             open(os.path.join(d, DIRNAME, "tm_menu.gd"), "rb") as a,
-            open(MENU_SRC, "rb") as b,
+            open(menu_src(godot_version(d)), "rb") as b,
         ):
             if a.read() != b.read():
                 return False

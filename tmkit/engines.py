@@ -222,7 +222,7 @@ RPGMAKER = Engine(
 
 # ------------------------------------------------------------------ Godot 4
 def _godot_detect(path):
-    # папка с .pck (или .exe со вшитым пакетом); Godot 3 тоже опознаём — inject откажет понятно
+    # папка с .pck (или .exe со вшитым пакетом): Godot 4 и 3 (у 3 — своё меню tm_menu3.gd)
     if os.path.isfile(path):
         if not path.lower().endswith((".pck", ".exe")):
             return False
@@ -237,7 +237,7 @@ def _godot_detect(path):
 
 GODOT = Engine(
     key="godot",
-    title="Godot 4",
+    title="Godot 3 / 4",
     target_kind="godot-folder",
     # меню находит переменные само в рантайме; scan — подсказка по сценам Dialogic из .pck
     steps=("scan", "deploy", "uninstall"),

@@ -735,3 +735,44 @@ def test_bridge_sync_delivers_commands_once():
         text = open(os.path.join(ROOT, *f), encoding="utf-8").read()
         for k in keys:
             assert k in text, (f, k)
+
+
+def _mk_fake_pck3(path, files):
+    """Минимальный .pck формата 1 (Godot 3): без флагов пакета и записей."""
+    import struct
+
+    entries = [("res://" + n, t.encode()) for n, t in files.items()]
+    head = struct.pack("<4sIIII", b"GDPC", 1, 3, 5, 1) + b"\0" * 64
+    dir_size = 4 + sum(4 + len(n.encode()) + 16 + 16 for n, _ in entries)
+    d, data, ofs = struct.pack("<I", len(entries)), b"", len(head) + dir_size
+    for n, b in entries:
+        nb = n.encode()
+        d += struct.pack("<I", len(nb)) + nb + struct.pack("<QQ", ofs, len(b)) + b"\0" * 16
+        data += b
+        ofs += len(b)
+    with open(path, "wb") as f:
+        f.write(head + d + data)
+
+
+def test_godot3_gets_gdscript1_menu_and_godot4_flies():
+    gi = engines._load_engine_module("godot", "inject.py")
+    with tempfile.TemporaryDirectory() as tmp:
+        _mk_fake_pck3(os.path.join(tmp, "Game.pck"), {"project.binary": "x"})
+        assert gi.godot_version(tmp)[0] == 3
+        assert engines.detect_engine(tmp).key == "godot"
+        msg = gi.deploy_file(tmp)
+        assert "Godot 3.5.1" in msg, msg
+        got = open(os.path.join(tmp, "tm_godot", "tm_menu.gd"), encoding="utf-8").read()
+        assert got == open(gi.MENU_SRC3, encoding="utf-8").read()
+        assert gi.is_installed(tmp) and gi.is_current(tmp)
+        gi.remove_file(tmp)
+        assert not gi.is_installed(tmp)
+    g3 = open(gi.MENU_SRC3, encoding="utf-8").read()
+    # GDScript 1: без лямбд и аннотаций Godot 4, сигналы через connect(сигнал, self, метод)
+    for bad in ("func():", "@onready", "@export", "await ", "Callable(", "-> void"):
+        assert bad not in g3, bad
+    for need in ('connect("pressed", self, method, binds)', "yield(get_tree()", "Engine.time_scale", "TYPE_REAL"):
+        assert need in g3, need
+    g4 = open(gi.MENU_SRC, encoding="utf-8").read()
+    for need in ("func _set_fly", "func _set_noclip", "set_physics_process(false)", "collision_mask = 0"):
+        assert need in g4, need
