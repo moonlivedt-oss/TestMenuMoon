@@ -412,15 +412,22 @@ namespace TestMenuMono
             }
         }
 
+        // TM_TOKENS_START: цвета из engines/_shared/tm_tokens.json (python tools/gen_tokens.py)
+        static readonly Color Bg = new Color(0.063f, 0.078f, 0.114f, 1f);
+        static readonly Color Acc = new Color(0.220f, 0.878f, 0.784f, 1f);
+        static readonly Color Txt = new Color(0.906f, 0.922f, 0.949f, 1f);
+        static readonly Color Dim = new Color(0.604f, 0.639f, 0.706f, 1f);
+        // TM_TOKENS_END
+
         static void Styles()
         {
             if (sHead != null) return;
             sHead = new GUIStyle(GUI.skin.label); sHead.fontSize = 20; sHead.fontStyle = FontStyle.Bold;
-            sHead.normal.textColor = new Color(0.22f, 0.88f, 0.78f);
-            sDim = new GUIStyle(GUI.skin.label); sDim.fontSize = 12; sDim.normal.textColor = new Color(0.6f, 0.63f, 0.7f); sDim.wordWrap = true;
-            sAcc = new GUIStyle(GUI.skin.label); sAcc.fontStyle = FontStyle.Bold; sAcc.normal.textColor = new Color(0.22f, 0.88f, 0.78f);
+            sHead.normal.textColor = Acc;
+            sDim = new GUIStyle(GUI.skin.label); sDim.fontSize = 12; sDim.normal.textColor = Dim; sDim.wordWrap = true;
+            sAcc = new GUIStyle(GUI.skin.label); sAcc.fontStyle = FontStyle.Bold; sAcc.normal.textColor = Acc;
             sBox = new GUIStyle(GUI.skin.box);
-            var t = new Texture2D(1, 1); t.SetPixel(0, 0, new Color(0.06f, 0.08f, 0.11f, 0.97f)); t.Apply();
+            var t = new Texture2D(1, 1); t.SetPixel(0, 0, Bg); t.Apply();
             sBox.normal.background = t;
         }
 
@@ -449,7 +456,7 @@ namespace TestMenuMono
             if (GUILayout.Button("Закрыть", GUILayout.Width(110))) { Toggle(false); GUILayout.EndHorizontal(); GUILayout.EndArea(); return; }
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
-            string[,] tabs = { { "main", "Главное" }, { "vars", "Все переменные" }, { "game", "Игра" }, { "scan", "Поиск" }, { "help", "Справка" } };
+            string[,] tabs = { { "main", "Значения" }, { "vars", "Все переменные" }, { "game", "Игра" }, { "scan", "Поиск" }, { "help", "Справка" } };
             for (int i = 0; i < tabs.GetLength(0); i++)
                 if (GUILayout.Toggle(tab == tabs[i, 0], tabs[i, 1], GUI.skin.button, GUILayout.Width(150))) { if (tab != tabs[i, 0]) scroll = Vector2.zero; tab = tabs[i, 0]; }
             GUILayout.EndHorizontal();

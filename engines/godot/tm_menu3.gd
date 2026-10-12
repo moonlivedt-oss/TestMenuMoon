@@ -5,12 +5,15 @@ extends CanvasLayer
 # полёт и «сквозь стены». Shift+T / F9 — открыть, Esc — закрыть; пока меню открыто,
 # игра на паузе.
 
+# TM_TOKENS_START: цвета из engines/_shared/tm_tokens.json (python tools/gen_tokens.py)
 const ACCENT = Color("#38e0c8")
 const BG = Color("#10141d")
 const BG2 = Color("#1e2432")
 const TXT = Color("#e7ebf2")
-const DIM = Color("#8b93a3")
-const WARN = Color("#f0b429")
+const DIM = Color("#9aa3b4")
+const WARN = Color("#ffb454")
+const INK = Color("#07110f")
+# TM_TOKENS_END
 
 var root
 var body
@@ -225,7 +228,7 @@ func _build_ui():
 	var gap = Control.new()
 	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(gap)
-	head.add_child(_button("Переменные", "_set_tab", ["vars"]))
+	head.add_child(_button("Значения", "_set_tab", ["vars"]))
 	head.add_child(_button("Игра", "_set_tab", ["game"]))
 	head.add_child(_button("X", "toggle", [false], "Закрыть (Esc)"))
 	var sc = ScrollContainer.new()

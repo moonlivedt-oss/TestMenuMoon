@@ -748,8 +748,17 @@ namespace TestMenu
         float k = 1f;
 
         GUIStyle sBad, sWin, sShade, sHead, sHeadBg, sText, sDim, sAcc, sBtn, sBtnOn, sField, sFieldOn, sRow, sThumb, sGroup;
-        static readonly Color Bg = new Color(0.063f, 0.078f, 0.114f, 1f), Bg3 = new Color(0.118f, 0.141f, 0.196f, 1f),
-            Acc = new Color(0.22f, 0.878f, 0.784f, 1f), Txt = new Color(0.906f, 0.922f, 0.949f, 1f), Dim = new Color(0.545f, 0.576f, 0.639f, 1f);
+        // TM_TOKENS_START: цвета из engines/_shared/tm_tokens.json (python tools/gen_tokens.py)
+        static readonly Color Bg = new Color(0.063f, 0.078f, 0.114f, 1f);
+        static readonly Color Bg2 = new Color(0.086f, 0.106f, 0.149f, 1f);
+        static readonly Color Bg3 = new Color(0.118f, 0.141f, 0.196f, 1f);
+        static readonly Color Acc = new Color(0.220f, 0.878f, 0.784f, 1f);
+        static readonly Color Txt = new Color(0.906f, 0.922f, 0.949f, 1f);
+        static readonly Color Dim = new Color(0.604f, 0.639f, 0.706f, 1f);
+        static readonly Color Ink = new Color(0.027f, 0.067f, 0.059f, 1f);
+        static readonly Color Err = new Color(1.000f, 0.420f, 0.420f, 1f);
+        static readonly Color Line = new Color(0.192f, 0.227f, 0.298f, 1f);
+        // TM_TOKENS_END
 
         static Texture2D Tex(Color c)
         {
@@ -770,7 +779,7 @@ namespace TestMenu
             sShade = new GUIStyle(GUI.skin.box);
             sShade.normal.background = Tex(new Color(0.02f, 0.03f, 0.05f, 0.65f));
             sHead = new GUIStyle(GUI.skin.label) { fontSize = fs(24), fontStyle = FontStyle.Bold };
-            sHead.normal.textColor = new Color(0.03f, 0.07f, 0.06f);
+            sHead.normal.textColor = Txt;
             sText = new GUIStyle(GUI.skin.label) { fontSize = fs(18), clipping = TextClipping.Clip };
             sText.normal.textColor = Txt;
             sDim = new GUIStyle(sText) { fontSize = fs(13) };
@@ -782,10 +791,10 @@ namespace TestMenu
             sBtn.hover.background = Tex(Acc);
             sBtn.active.background = Tex(Acc);
             sBtn.normal.textColor = Txt;
-            sBtn.hover.textColor = new Color(0.03f, 0.07f, 0.06f);
+            sBtn.hover.textColor = Ink;
             sBtnOn = new GUIStyle(sBtn);
             sBtnOn.normal.background = Tex(Acc);
-            sBtnOn.normal.textColor = new Color(0.03f, 0.07f, 0.06f);
+            sBtnOn.normal.textColor = Ink;
             sField = new GUIStyle(sBtn) { alignment = TextAnchor.MiddleLeft };
             sField.normal.background = Tex(new Color(0.04f, 0.05f, 0.08f, 1f));
             sField.hover.background = Tex(new Color(0.09f, 0.11f, 0.16f, 1f));
@@ -798,17 +807,17 @@ namespace TestMenu
             sThumb = new GUIStyle(GUI.skin.box);
             sThumb.normal.background = Tex(Acc);
             sHeadBg = new GUIStyle(GUI.skin.box);
-            sHeadBg.normal.background = Tex(Acc);
+            sHeadBg.normal.background = Tex(Bg2);
             sGroup = new GUIStyle(sBtn) { alignment = TextAnchor.MiddleLeft, fontStyle = FontStyle.Bold };
             sGroup.normal.textColor = Acc;
             sBad = new GUIStyle(sDim);
-            sBad.normal.textColor = new Color(1f, 0.42f, 0.42f);
+            sBad.normal.textColor = Err;
             hoverOf.Clear();
             foreach (var st in new[] { sBtn, sGroup, sField })
             {
                 var h = new GUIStyle(st);
                 h.normal.background = st == sField ? Tex(new Color(0.09f, 0.11f, 0.16f, 1f)) : Tex(Acc);
-                h.normal.textColor = st == sField ? Txt : new Color(0.03f, 0.07f, 0.06f);
+                h.normal.textColor = st == sField ? Txt : Ink;
                 hoverOf[st] = h;
             }
         }
@@ -1075,11 +1084,12 @@ namespace TestMenu
             // шапка: рамка с цветным фоном (GUI.DrawTexture в части игр вырезан)
             var head = new Rect(win.x, win.y, w, 52 * k);
             GUI.Box(head, "", sHeadBg);
+            GUI.DrawTexture(new Rect(head.x, head.yMax - 2f * k, head.width, 2f * k), sThumb.normal.background);
             GUI.Label(new Rect(head.x + 18 * k, head.y + 10 * k, w * 0.6f, 34 * k), "TEST MENU  |  " + Application.productName, sHead);
             if (B(new Rect(head.xMax - 130 * k, head.y + 10 * k, 116 * k, 32 * k), "Закрыть", sBtn)) Toggle(false);
             // вкладки
             float x = win.x + 12 * k, y = head.yMax + 10 * k;
-            foreach (var (key, label) in new[] { ("main", "Главное"), ("vars", "Все переменные"), ("game", "Игра"), ("scan", "Поиск значения"), ("help", "Справка") })
+            foreach (var (key, label) in new[] { ("main", "Значения"), ("vars", "Все переменные"), ("game", "Игра"), ("scan", "Поиск"), ("help", "Справка") })
             {
                 if (B(new Rect(x, y, 150 * k, 34 * k), label, tab == key ? sBtnOn : sBtn)) { tab = key; scrollY = 0; focusId = null; }
                 x += 156 * k;
@@ -1747,7 +1757,7 @@ namespace TestMenu
                 "",
                 "Игра: скорость (пауза, ×0.25 … ×5) и точки телепорта игрока (объект с тегом Player).",
                 "",
-                "Поиск значения: «Снимок», закрой меню, измени значение в игре, вернись и жми",
+                "Поиск: «Снимок», закрой меню, измени значение в игре, вернись и жми",
                 "«изменились» / «больше» / «меньше», пока не останется пара строк.",
                 "",
                 "«Обновить» — после загрузки сохранения или смены сцены.",

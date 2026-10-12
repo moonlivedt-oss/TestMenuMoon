@@ -6,17 +6,22 @@ extends CanvasLayer
 ## сцены Dialogic (.dtl) с их условиями. Shift+T / F9 — открыть, Esc — закрыть. Пока меню
 ## открыто, игра на паузе (клики и клавиши в неё не уходят).
 
-const TABS = [["vars", "Переменные", "stats"], ["unlock", "Открытое", "key"],
+const TABS = [["vars", "Значения", "stats"], ["unlock", "Открытое", "key"],
 		["story", "Сюжет", "story"], ["game", "Игра", "stopwatch"], ["scan", "Поиск", "scanner"],
 		["help", "Справка", "question"]]
+# TM_TOKENS_START: цвета из engines/_shared/tm_tokens.json (python tools/gen_tokens.py)
 const ACCENT = Color("#38e0c8")
 const BG = Color("#10141d")
 const BG2 = Color("#161b26")
 const BG3 = Color("#1e2432")
 const TXT = Color("#e7ebf2")
-const DIM = Color("#8b93a3")
+const DIM = Color("#9aa3b4")
 const BAD = Color("#ff6b6b")
 const GOOD = Color("#5ad469")
+const WARN = Color("#ffb454")
+const INK = Color("#07110f")
+const LINE = Color("#313a4c")
+# TM_TOKENS_END
 const SKIP_METHODS = ["save", "load", "delete", "create", "import", "export", "encode", "decode", "sync", "update", "deferred", "level",
 		"get", "is", "has", "set", "on", "print", "quit", "free", "queue", "emit", "connect", "notification"]
 
@@ -502,7 +507,7 @@ func _build_ui() -> void:
 	ui_root.add_child(shade)
 
 	win = PanelContainer.new()
-	win.add_theme_stylebox_override("panel", _box(BG, 16, ACCENT, 2))
+	win.add_theme_stylebox_override("panel", _box(BG, 16, LINE, 1))
 	ui_root.add_child(win)
 	var col = VBoxContainer.new()
 	col.add_theme_constant_override("separation", 0)
@@ -510,7 +515,9 @@ func _build_ui() -> void:
 
 	# шапка
 	var head = PanelContainer.new()
-	var hb = _box(ACCENT, 0)
+	var hb = _box(BG2, 0)
+	hb.border_color = ACCENT
+	hb.border_width_bottom = 2
 	hb.corner_radius_top_left = 14
 	hb.corner_radius_top_right = 14
 	hb.content_margin_left = 16
@@ -522,9 +529,9 @@ func _build_ui() -> void:
 	var hrow = HBoxContainer.new()
 	head.add_child(hrow)
 	hrow.add_child(_icon("logo", 32))
-	var title = _label("TEST MENU", 22, Color("#07110f"))
+	var title = _label("TEST MENU", 22, TXT)
 	hrow.add_child(title)
-	var sub = _label("  " + str(ProjectSettings.get_setting("application/config/name", "")) + " | Godot " + Engine.get_version_info()["string"], 15, Color("#07110f99"))
+	var sub = _label("  " + str(ProjectSettings.get_setting("application/config/name", "")) + " | Godot " + Engine.get_version_info()["string"], 15, DIM)
 	sub.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hrow.add_child(sub)
 	var close = _button("Закрыть", func(): toggle(false))
@@ -724,7 +731,7 @@ func _filter_box(current: String, cb: Callable, hint: String) -> LineEdit:
 # ------------------------------------------------------------------ вкладка: переменные
 func _tab_vars() -> void:
 	var top = _row()
-	top.add_child(_label("Переменные", 21))
+	top.add_child(_label("Значения", 21))
 	top.add_child(_filter_box(filter_text, func(t): filter_text = t; refresh(), "фильтр по имени, Enter"))
 	var sp = Control.new()
 	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1237,7 +1244,7 @@ func _tab_help() -> void:
 	_heading("Как пользоваться", "question")
 	for t in [
 		["Открыть и закрыть", "Shift+T или F9, Esc — закрыть. Пока меню открыто, игра на паузе."],
-		["Переменные", "Всё, что игра хранит: деньги, статы, прогресс персонажей, переменные диалогов. Серая строка — где значение проверяется в сценах и что нужно. Мишень — поставить порог из условий. Снежинка — заморозить."],
+		["Значения", "Всё, что игра хранит: деньги, статы, прогресс персонажей, переменные диалогов. Серая строка — где значение проверяется в сценах и что нужно. Мишень — поставить порог из условий. Снежинка — заморозить."],
 		["Открытое", "Список разблокировок игры (одежда, предметы, события) — включай и выключай."],
 		["Сюжет", "Действия самой игры (следующий день, время суток) и запуск любой сцены диалогов."],
 		["Игра", "Скорость игры (пауза, ×0.25 … ×5) и точки телепорта игрока (узел в группе player или Player в сцене)."],
