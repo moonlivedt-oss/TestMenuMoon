@@ -201,3 +201,8 @@ LZString с эталоном), веб-ядро, движок Ren'Py. Тесты 
 [RE-UE4SS](https://github.com/UE4SS-RE/RE-UE4SS), [AssetRipper](https://github.com/AssetRipper/AssetRipper),
 [Cpp2IL](https://github.com/SamboyCoding/Cpp2IL), [unrpyc](https://github.com/CensoredUsername/unrpyc).
 `tmkit/lzstring.py` — порт [lz-string](https://github.com/pieroxy/lz-string) (MIT).
+
+## Лицензия
+
+[MIT](LICENSE). Скриншоты в `docs/screenshots` сняты на тестовых играх; фон и персонаж в них —
+из демо-игры The Question (Ren'Py SDK) и под лицензию проекта не попадают.
