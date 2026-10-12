@@ -31,7 +31,7 @@ def test_twine_inject_without_body_appends():
 
 
 def test_engines_registry_capabilities():
-    assert set(engines.REGISTRY) == {"renpy", "twine", "rpgmaker", "godot", "unity", "web", "unreal"}
+    assert set(engines.REGISTRY) == {"renpy", "twine", "rpgmaker", "godot", "unity", "web", "unreal", "gamemaker"}
     assert engines.REGISTRY["web"].supports("deploy") and not engines.REGISTRY["web"].supports("extract")
     assert engines.REGISTRY["godot"].supports("deploy") and engines.REGISTRY[
         "godot"
@@ -776,3 +776,24 @@ def test_godot3_gets_gdscript1_menu_and_godot4_flies():
     g4 = open(gi.MENU_SRC, encoding="utf-8").read()
     for need in ("func _set_fly", "func _set_noclip", "set_physics_process(false)", "collision_mask = 0"):
         assert need in g4, need
+
+
+def test_gamemaker_detect_script_and_guards():
+    gm = engines._load_engine_module("gamemaker", "inject.py")
+    with tempfile.TemporaryDirectory() as tmp:
+        open(os.path.join(tmp, "data.win"), "wb").write(b"FORM\0\0\0\0")
+        open(os.path.join(tmp, "MyGame.exe"), "wb").write(b"MZ")
+        assert engines.detect_engine(tmp).key == "gamemaker"
+        assert not gm.is_installed(tmp) and gm.remove_file(tmp).endswith("(нет data.win.tm_bak)")
+        if gm.cli_path() is None:
+            try:
+                gm.deploy_file(tmp)
+                raise AssertionError("без UTMT установка должна отказаться")
+            except FileNotFoundError as e:
+                assert "UTMT_CLI" in str(e)
+            assert not os.path.exists(os.path.join(tmp, "data.win.tm_bak"))
+    csx = gm.script_text()
+    assert "%CREATE%" not in csx and "%STEP%" not in csx and "%DRAW%" not in csx
+    # GML в C#-строке @"…": кавычки удвоены, иначе скрипт UTMT не скомпилируется
+    assert 'keyboard_check_pressed(ord(""T""))' in csx and 'ord("T")' not in csx
+    assert "IsVersionAtLeast(2, 3)" in csx and "EventSubtypeDraw.DrawGUI" in csx

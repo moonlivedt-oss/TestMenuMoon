@@ -7,6 +7,7 @@
     UnityExplorer  — плагин BepInEx: окно в игре — объекты, поля, значения на лету
     BepInEx 5 (x64 и x86) и UnityExplorer Mono — то же для Mono-игр Unity
     UE4SS          — загрузчик модов для Unreal Engine 4/5 (кладётся в tools/unity/UE4SS)
+    UTMT_CLI       — UndertaleModTool CLI: внедрение меню в data.win игр GameMaker 2.3+
 
 Ссылки и версии закреплены ниже; обновить — поменять URL и запустить снова
 (уже скачанное пропускается). Запуск:  python tools/fetch_unity_tools.py
@@ -67,6 +68,12 @@ TOOLS = [
         "UE4SS",
         "3.0.1",
         "https://github.com/UE4SS-RE/RE-UE4SS/releases/download/v3.0.1/UE4SS_v3.0.1.zip",
+    ),
+    # GameMaker 2.3+: UndertaleModTool CLI собирает data.win с объектом меню
+    (
+        "UTMT_CLI",
+        "0.9.2.0",
+        "https://github.com/UnderminersTeam/UndertaleModTool/releases/download/0.9.2.0/UTMT_CLI_v0.9.2.0-Windows.zip",
     ),
 ]
 

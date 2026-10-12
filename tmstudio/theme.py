@@ -24,7 +24,7 @@ ICON_DIR = os.path.join(ASSETS, "icons")  # наклейки из библиот
 ACCENT = getattr(games, "ACCENT", "#38e0c8")
 
 # короткие ярлыки движков для списка игр
-ENGINE_BADGE = {"renpy": "Ren'Py", "twine": "Twine", "rpgmaker": "RPG Maker", "godot": "Godot", "unity": "Unity", "web": "HTML5", "unreal": "Unreal"}
+ENGINE_BADGE = {"renpy": "Ren'Py", "twine": "Twine", "rpgmaker": "RPG Maker", "godot": "Godot", "unity": "Unity", "web": "HTML5", "unreal": "Unreal", "gamemaker": "GameMaker"}
 
 # ------------------------------------------------------------------ палитра
 # Слоистая тёмная тема: BG0 (окно) < BG1 (панели) < BG2 (карточки) < BG3 (контролы).

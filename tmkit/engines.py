@@ -276,10 +276,22 @@ UNREAL = Engine(
 )
 
 
+# ------------------------------------------------------------------ GameMaker 2.3+ (UTMT)
+GAMEMAKER = Engine(
+    key="gamemaker",
+    title="GameMaker (UTMT)",
+    target_kind="gamemaker-folder",
+    # объект меню на GML внутри data.win (UndertaleModTool CLI); оригинал — data.win.tm_bak
+    steps=("deploy", "uninstall"),
+    detect=_call("gamemaker", "is_gamemaker"),
+    **_injector("gamemaker"),
+)
+
+
 # ------------------------------------------------------------------ реестр
 # порядок важен для detect: папочные движки до Ren'Py, затем Twine (по маркерам в HTML),
 # последний — HTML5: любой оставшийся HTML
-REGISTRY = {e.key: e for e in (RPGMAKER, UNITY, GODOT, UNREAL, RENPY, TWINE, WEB)}
+REGISTRY = {e.key: e for e in (RPGMAKER, UNITY, GODOT, UNREAL, GAMEMAKER, RENPY, TWINE, WEB)}
 
 
 def detect_engine(path):
@@ -302,6 +314,7 @@ HOTKEYS = {
     "unity": "Shift+T / F9 (F7 — UnityExplorer)",
     "web": "Shift+T",
     "unreal": "Ctrl+Shift+H (справка), окно UE4SS — Live View",
+    "gamemaker": "Shift+T / F9 (Tab — страницы)",
 }
 
 
