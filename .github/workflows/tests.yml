@@ -1,6 +1,5 @@
-# Smoke tests for the tmkit toolkit. No external deps (pure stdlib),
-# so no pip install step is needed. Runs on Windows to match the dev
-# environment (Windows-centric paths, .exe launcher autodetect).
+# Тесты тулкита (стандартная библиотека, без pip install), ruff и lint меню на настоящем Ren'Py.
+# Windows — как у разработчика: пути, .exe-лаунчеры, csc.exe для Mono-плагина.
 name: tests
 
 on:
@@ -21,8 +20,48 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Run smoke tests
+      - name: Run tests
         env:
           PYTHONIOENCODING: utf-8
           PYTHONUTF8: "1"
         run: python tests/run.py
+
+  ruff:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff==0.16.9
+      - run: ruff check .
+
+  renpy-lint:
+    # меню Ren'Py — самая большая часть проекта: lint на двух ветках SDK (py3 и py2)
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        renpy: ["8.5.3", "7.8.7"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Cache Ren'Py SDK
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: renpy-${{ matrix.renpy }}-sdk
+          key: renpy-sdk-${{ matrix.renpy }}
+      - name: Download Ren'Py SDK
+        if: steps.cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          Invoke-WebRequest "https://www.renpy.org/dl/${{ matrix.renpy }}/renpy-${{ matrix.renpy }}-sdk.zip" -OutFile sdk.zip
+          Expand-Archive sdk.zip -DestinationPath .
+      - name: Lint menu
+        env:
+          PYTHONIOENCODING: utf-8
+          PYTHONUTF8: "1"
+        run: python tools/ci_renpy_lint.py renpy-${{ matrix.renpy }}-sdk

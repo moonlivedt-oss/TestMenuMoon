@@ -931,3 +931,27 @@ def test_engine_relative_input_regex():
     assert rx.match("-10").groups() == ("-", "10")
     assert rx.match("*2") and rx.match("/2,5") and rx.match("× 3")
     assert not rx.match("50") and not rx.match("=-5") and not rx.match("+abc")
+
+
+def test_deploy_does_not_hide_menu_files():
+    """Установка не прячет файлы меню: раньше знаковый результат GetFileAttributesW (-1 у
+    несуществующего файла) читался как «скрытый», и после установки прятались все файлы."""
+    if os.name != "nt":
+        return
+    import ctypes
+
+    def hidden(p):
+        return bool(ctypes.windll.kernel32.GetFileAttributesW(p) & 0xFFFFFFFF & 2)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        game = os.path.join(tmp, "game")
+        os.makedirs(game)
+        open(os.path.join(game, "script.rpy"), "w").close()
+        tmdeploy.quick_install(game)
+        eng = os.path.join(game, tmdeploy.ENGINE_NAME)
+        assert os.path.isfile(eng) and not hidden(eng)
+        # а спрятанное пользователем остаётся спрятанным после переустановки
+        ctypes.windll.kernel32.SetFileAttributesW(eng, 0x22)
+        tmdeploy.quick_install(game)
+        assert hidden(eng)
+        ctypes.windll.kernel32.SetFileAttributesW(eng, 0x20)

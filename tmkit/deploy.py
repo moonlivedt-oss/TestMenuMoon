@@ -92,7 +92,9 @@ def _attrs(path):
     try:
         import ctypes
 
-        a = ctypes.windll.kernel32.GetFileAttributesW(str(path))
+        # & 0xFFFFFFFF: ctypes отдаёт результат знаковым — «нет файла» приходило как -1, и
+        # -1 & HIDDEN считался «скрытым»: после установки меню прятались все его файлы
+        a = ctypes.windll.kernel32.GetFileAttributesW(str(path)) & 0xFFFFFFFF
         return None if a == 0xFFFFFFFF else a
     except (AttributeError, OSError):
         return None  # не Windows

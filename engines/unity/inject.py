@@ -189,7 +189,7 @@ def _unhide(d):
             paths += [os.path.join(base, x) for x in dirs + files]
     hidden = []
     for p in dict.fromkeys(paths):
-        a = k32.GetFileAttributesW(p)
+        a = k32.GetFileAttributesW(p) & 0xFFFFFFFF  # знаковый результат: «нет файла» = -1
         if a != 0xFFFFFFFF and a & 2:
             k32.SetFileAttributesW(p, a & ~2)
             hidden.append(p)
@@ -203,7 +203,7 @@ def _rehide(paths):
 
     k32 = ctypes.windll.kernel32
     for p in paths:
-        a = k32.GetFileAttributesW(p)
+        a = k32.GetFileAttributesW(p) & 0xFFFFFFFF
         if a != 0xFFFFFFFF:
             k32.SetFileAttributesW(p, a | 2)
 
