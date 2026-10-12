@@ -125,7 +125,7 @@ screen tm_tab_story():
                             action Function(tm_goto_node, _nm)
                             hbox:
                                 spacing 12
-                                text ("%s:%d" % (_fn.split("/")[-1], _ln)) style "tm_btn_text" size 15 color "#8b93a3" min_width 190 yalign 0.5
+                                text ("%s:%d" % (_fn.split("/")[-1], _ln)) style "tm_btn_text" size 15 color TM_TOK["text_hint"] min_width 190 yalign 0.5
                                 text tm_q(_tm_short((_who + ": " if _who else "") + _what, 70)) style "tm_btn_text" size 17 yalign 0.5
             elif len(tm_ui.find_text.strip()) >= 3:
                 text "Не найдено." style "tm_dim"
@@ -304,7 +304,7 @@ screen tm_tab_test():
                 if tm_ui.scene_open == _sn:
                     $ _refs = tm_scene_refs(_sn)
                     frame:
-                        background Solid("#ffffff0a")
+                        background Solid(TM_TOK["tint_1"])
                         padding (14, 6)
                         xfill True
                         vbox:
@@ -393,7 +393,7 @@ screen tm_tab_settings():
                     for _name, _hex in TM_ACCENTS:
                         frame:
                             padding (3, 3)
-                            background (Frame(Solid("#ffffff"), 4, 4) if _cur_accent == _hex else Solid("#00000000"))
+                            background (Frame(Solid(TM_TOK["text_bright"]), 4, 4) if _cur_accent == _hex else Solid("#00000000"))
                             button:
                                 xysize (40, 40)
                                 background Frame(Solid(_hex), 6, 6)

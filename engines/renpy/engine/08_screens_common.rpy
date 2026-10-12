@@ -67,7 +67,7 @@ screen tm_sep():
     frame:
         xfill True
         ysize 1
-        background Solid("#ffffff14")
+        background Solid(TM_TOK["tint_2"])
 
 # пустое состояние: маскот + пояснение
 screen tm_empty(mascot, msg):
@@ -119,7 +119,7 @@ screen tm_auto_badge():
             spacing 10
             use tm_icon("rocket", 24)
             text tm_q(tm_auto_badge_text()) style "tm_hud_label"
-            text (tm_keys_text() + u" — стоп") style "tm_hud_label" color "#8b93a3"
+            text (tm_keys_text() + u" — стоп") style "tm_hud_label" color TM_TOK["text_hint"]
 
 # ---------------------- свои уведомления ----------------------
 transform tm_toast_fx(z=1.0):
@@ -141,10 +141,10 @@ screen tm_toasts():
                 # цветная полоса слева = отступ внешней рамки, высота — по тексту
                 frame at tm_toast_fx(tm_k()):
                     xalign 0.5
-                    background Solid(TM_TOAST_COLORS.get(_kind, "#38e0c8"))
+                    background Solid(TM_TOAST_COLORS.get(_kind, TM_TOK["accent"]))
                     padding (6, 0, 0, 0)
                     frame:
-                        background Solid("#0b0e14f2")
+                        background Solid(TM_TOK["bg_window"] + "f2")
                         padding (14, 9, 18, 9)
                         text tm_q(_msg) style "tm_tip" size 18 xmaximum 900
 
@@ -194,7 +194,7 @@ screen tm_hud():
                         if tm_ic("snow"):
                             add tm_ic("snow") zoom 0.3 yalign 0.5
                         else:
-                            text "*" style "tm_hud_label" color "#9fd8ff"
+                            text "*" style "tm_hud_label" color TM_TOK["frozen"]
                     if _fl:
                         text _fl[0] style "tm_hud_value" color _fl[1] at tm_flash_fx
 
@@ -237,9 +237,9 @@ screen tm_hints_panel(node):
                                 action Function(tm_code_toggle, (node, _i))
                         if (node, _i) in tm_ui.code_peek:
                             frame:
-                                background Solid("#ffffff0a")
+                                background Solid(TM_TOK["tint_1"])
                                 padding (10, 6)
-                                text tm_q(tm_choice_code(node, _i)) style "tm_hint_eff" size 14 color "#9aa3b5"
+                                text tm_q(tm_choice_code(node, _i)) style "tm_hint_eff" size 14 color TM_TOK["text_hint"]
                         if not _vis:
                             text (u"скрыт, условие: " + tm_q(_tm_short(_cond, 52))) style "tm_hint_note"
                             $ _now = tm_cond_now(_cond)

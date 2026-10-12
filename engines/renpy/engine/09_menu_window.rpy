@@ -23,7 +23,7 @@ screen tm_menu():
         style "tm_shade"
         xfill True
         yfill True
-        background "#05070bcc"
+        background (TM_TOK["shade"] + "cc")
         action NullAction()
 
     # --- перетаскиваемое окно (хват — за шапку) ---
@@ -72,7 +72,7 @@ screen tm_menu():
                                             use tm_icon("logo", 34)
                                             # tm_q: «{» в заголовке игры иначе ломал текст-теги
                                             text tm_q(tm_title) style "tm_head_title" yalign 0.5
-                                            text tm_engine_tag() style "tm_head_btn_text" color "#0a0c1099" bold False yalign 0.5
+                                            text tm_engine_tag() style "tm_head_btn_text" color (TM_TOK["on_accent"] + "99") bold False yalign 0.5
                                         hbox:
                                             spacing 8
                                             xalign 1.0

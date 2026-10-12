@@ -234,7 +234,7 @@ init -5 python:
         now = tm_now()
         return [t for t in tm_ui.toasts if now - t[0] < TM_TOAST_LIFE]
 
-    TM_TOAST_COLORS = {"ok": "#38e0c8", "warn": "#ffb454", "bad": "#ff6b6b"}
+    TM_TOAST_COLORS = {"ok": TM_TOK["accent"], "warn": TM_TOK["warn"], "bad": TM_TOK["err"]}
 
     # ---------------- границы статов (min / max) ----------------
     # В data-файле строка стата: ("Метка", "путь") или ("Метка", "путь", "min", "max").
@@ -472,7 +472,7 @@ init -5 python:
         except Exception:
             pass
         return [n for n in names
-                if not n.startswith(("_", "tm_", "tmtr"))
+                if not n.startswith(("_", "tm_", "TM_", "tmtr"))
                 and n not in TM_SCAN_SKIP_TOP and n not in TM_AUTO_SKIP]
 
     def _tm_game_obj(v):
@@ -602,8 +602,8 @@ init -5 python:
             if isinstance(diff, float):
                 diff = round(diff, 3)
             return ((u"+%s" % tm_str(diff)) if diff > 0 else (u"−%s" % tm_str(-diff)),
-                    "#5ad469" if diff > 0 else "#ff6b6b")
-        return u"изм.", "#6cb6ff"
+                    TM_TOK["ok"] if diff > 0 else TM_TOK["err"])
+        return u"изм.", TM_TOK["info"]
 
     def _tm_take_seen():
         # при открытии меню: сравнить с прошлым открытием, запомнить текущее

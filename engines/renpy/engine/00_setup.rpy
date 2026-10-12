@@ -39,7 +39,7 @@ init -10 python:
     if not hasattr(store, "tm_title"):
         store.tm_title = "TEST MENU"
     if not hasattr(store, "tm_accent"):
-        store.tm_accent = "#38e0c8"
+        store.tm_accent = TM_TOK["accent"]
     if not hasattr(store, "tm_stats"):
         store.tm_stats = []
     if not hasattr(store, "tm_actions"):
@@ -127,7 +127,7 @@ init -10 python:
 
     def tm_acc():
         # акцент для экранов: тема (tm_ui.accent) -> data-файл -> по умолчанию
-        return tm_ui.accent or getattr(store, "tm_accent", None) or "#38e0c8"
+        return tm_ui.accent or getattr(store, "tm_accent", None) or TM_TOK["accent"]
 
 # Встроенный в Ren'Py шрифт с кириллицей — не зависим от шрифта игры.
 define tm_font = "DejaVuSans.ttf"

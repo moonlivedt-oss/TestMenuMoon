@@ -216,7 +216,7 @@ init -3 python:
         parts = []
         for p, o, n in h["eff"]:
             t, k = tm_eff_text(p, o, n)
-            parts.append(u"{color=%s}%s{/color}" % (TM_HINT_COLORS.get(k, "#c7ccd4"), tm_q(t)))
+            parts.append(u"{color=%s}%s{/color}" % (TM_HINT_COLORS.get(k, TM_TOK["text_dim"]), tm_q(t)))
         if h.get("more"):
             parts.append(u"… и ещё %d" % h["more"])
         return u"   ".join(parts)
@@ -260,7 +260,7 @@ init -3 python:
         if not effs:
             return u"{color=#5b6373}без изменений{/color}"
         sym = {"up": u"+", "down": u"−", "set": u"=", "call": u"ƒ", "go": u"→"}
-        return u" ".join(u"{color=%s}%s{/color}" % (TM_HINT_COLORS.get(k, "#c7ccd4"), sym.get(k, u"-")) for k, _t in effs)
+        return u" ".join(u"{color=%s}%s{/color}" % (TM_HINT_COLORS.get(k, TM_TOK["text_dim"]), sym.get(k, u"-")) for k, _t in effs)
 
     def tm_peek_toggle(key):
         if key in tm_ui.peek:
@@ -703,7 +703,7 @@ init -3 python:
         if not f or tm_now() - f[1] > 2.8:
             return None
         d = f[0]
-        return ((u"+%s" % tm_str(d)) if d > 0 else (u"−%s" % tm_str(-d)), "#5ad469" if d > 0 else "#ff6b6b")
+        return ((u"+%s" % tm_str(d)) if d > 0 else (u"−%s" % tm_str(-d)), TM_TOK["ok"] if d > 0 else TM_TOK["err"])
 
     # ---------------- состояние меню между запусками: game/tm_state.json ----------------
     # Избранное, HUD, шаг, вкладка, позиция окна, добавленные из «Поиска» — в файле рядом

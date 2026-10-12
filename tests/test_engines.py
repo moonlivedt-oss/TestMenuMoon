@@ -819,3 +819,38 @@ def test_web_menu_strings_have_english():
                 missing.append((path[0], key))
     assert not missing, missing[:20]
     assert not [k for k, v in en.items() if not v], "пустые переводы"
+
+
+def test_tokens_fresh_and_used():
+    """Цвета меню и студии — из одного набора engines/_shared/tm_tokens.json: собранные файлы
+    свежие (python tools/gen_tokens.py), а в ядрах не осталось прописанных вручную цветов набора."""
+    import importlib.util
+    import re
+
+    spec = importlib.util.spec_from_file_location("gen_tok", os.path.join(ROOT, "tools", "gen_tokens.py"))
+    g = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(g)
+    assert g.stale() == [], "устарели: %s — python tools/gen_tokens.py" % g.stale()
+    cols = {v.lower()[:7] for k, v in g.load()["color"].items() if not k.startswith("tint_")}
+    cols.discard("#ffffff")
+    files = [os.path.join(ROOT, "engines", "_shared", "tm_menu_core.js"),
+             os.path.join(ROOT, "tmstudio", "theme.py")]
+    eng = os.path.join(ROOT, "engines", "renpy", "engine")
+    files += [os.path.join(eng, n) for n in os.listdir(eng)
+              if n.endswith(".rpy") and n not in ("00_tokens.rpy", "13_lang.rpy")]
+    hexre = re.compile(r"(?<!\{color=)#[0-9a-fA-F]{6}")
+    left = []
+    for f in files:
+        for m in hexre.finditer(open(f, encoding="utf-8").read()):
+            if m.group(0).lower() in cols:
+                left.append((os.path.basename(f), m.group(0)))
+    assert not left, left[:10]
+    js = tm_webinject_menu_js()
+    assert js.index("var TM_TOK") < js.index("window.TM_ADAPTER"), "tm_tokens.js — до адаптера"
+
+
+def tm_webinject_menu_js():
+    sys.path.insert(0, os.path.join(ROOT, "engines", "_shared"))
+    import tm_webinject
+
+    return tm_webinject.menu_js(os.path.join(ROOT, "engines", "web", "tm_menu.js"))

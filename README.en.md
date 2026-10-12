@@ -254,7 +254,9 @@ engines/
                          joined into one file, zzz_testmenu_engine.rpy
   renpy/                 lang_en.json (English; tools/gen_renpy_lang.py builds 13_lang.rpy),
                          zzz_testmenu_translate.rpy (line translation via AutoTranslatorMoon)
-  _shared/               the web menu core (tm_menu_core.js), language (tm_lang.js), icons, the
+  _shared/               tm_tokens.json, the one set of colors and sizes for the menus and the studio
+                         (tools/gen_tokens.py builds 00_tokens.rpy, tm_tokens.js, tmstudio/tokens.py);
+                         the web menu core (tm_menu_core.js), language (tm_lang.js), icons, the
                          shared <script> block (tm_webinject.py), HTML encodings, module loader (tm_load.py)
   rpgmaker, web, twine   menu adapter (tm_menu.js) + installer (inject.py) + scan.py
   godot                  tm_menu.gd (Godot 4), tm_menu3.gd (Godot 3), installer, .pck reader

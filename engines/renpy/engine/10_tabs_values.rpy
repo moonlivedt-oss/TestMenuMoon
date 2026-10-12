@@ -279,7 +279,7 @@ screen tm_tab_stats():
                                     if _dt:
                                         text tm_q(_dt[0]) style "tm_dim" size 15 color _dt[1] bold True yalign 0.5
                                     if _lt:
-                                        text tm_q(_lt) style "tm_dim" size 15 color ("#ffb454" if _out else "#6b7385") yalign 0.5
+                                        text tm_q(_lt) style "tm_dim" size 15 color (TM_TOK["warn"] if _out else TM_TOK["text_off"]) yalign 0.5
                                 if isinstance(val, bool):
                                     textbutton ("ВКЛ" if val else "выкл"):
                                         style "tm_btn" text_style "tm_btn_text"

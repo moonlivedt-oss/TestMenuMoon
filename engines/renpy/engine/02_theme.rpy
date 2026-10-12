@@ -2,9 +2,9 @@
 init -4 python:
     # Пресеты для вкладки «Настройки»
     TM_ACCENTS = [
-        ("Бирюза", "#38e0c8"), ("Голубой", "#4aa8ff"), ("Розовый", "#ff6b9d"),
-        ("Зелёный", "#5ad469"), ("Оранж", "#ff9f43"), ("Фиолет", "#b06bff"),
-        ("Красный", "#ff5c5c"), ("Белый", "#e7ebf2"),
+        ("Бирюза", TM_TOK["accent"]), ("Голубой", "#4aa8ff"), ("Розовый", "#ff6b9d"),
+        ("Зелёный", TM_TOK["ok"]), ("Оранж", "#ff9f43"), ("Фиолет", "#b06bff"),
+        ("Красный", "#ff5c5c"), ("Белый", TM_TOK["text"]),
     ]
     TM_OPACITY = [("70%", "b3"), ("85%", "d9"), ("95%", "f2"), ("100%", "ff")]
     TM_SCALES = [("S", 0.9), ("M", 1.0), ("L", 1.15)]
@@ -24,7 +24,7 @@ init -4 python:
 
     def tm_hex_alpha(a, aa):
         # "#abc" / "#aabbcc" + альфа "40" -> "#aabbcc40"
-        s = (a or "#38e0c8").lstrip("#")
+        s = (a or TM_TOK["accent"]).lstrip("#")
         if len(s) == 3:
             s = "".join(ch * 2 for ch in s)
         return "#" + s[:6] + aa
@@ -54,7 +54,7 @@ init -4 python:
     def tm_apply_theme():
         # Применяет акцент/прозрачность/масштаб к стилям и перестраивает их вживую.
         # Каждая часть — в своём try: сбой тонировки не отменяет масштаб шрифтов и т.п.
-        a  = tm_pref("tm_accent", None) or getattr(store, "tm_accent", None) or "#38e0c8"
+        a  = tm_pref("tm_accent", None) or getattr(store, "tm_accent", None) or TM_TOK["accent"]
         op = tm_pref("tm_opacity", "f7")
         try:
             sc = float(tm_pref("tm_scale", 1.0))
@@ -131,8 +131,8 @@ init -4 python:
             style.tm_icon_btn.selected_background = _acc
             style.tm_hud_frame.background = Frame(Transform("tm_ui/tm_panel.png", alpha=0.86), 26, 26)
             style.tm_hint_frame.background = Frame(Transform("tm_ui/tm_panel.png", alpha=0.92), 26, 26)
-            style.tm_head_btn.background = Frame(Transform(_bt, matrixcolor=TintMatrix("#07110f"), alpha=0.16), 13, 13)
-            style.tm_head_btn.hover_background = Frame(Transform(_bt, matrixcolor=TintMatrix("#07110f"), alpha=0.34), 13, 13)
+            style.tm_head_btn.background = Frame(Transform(_bt, matrixcolor=TintMatrix(TM_TOK["on_accent"]), alpha=0.16), 13, 13)
+            style.tm_head_btn.hover_background = Frame(Transform(_bt, matrixcolor=TintMatrix(TM_TOK["on_accent"]), alpha=0.34), 13, 13)
         else:
             style.tm_header_bg.background = Solid(a)
             style.tm_border.background = Frame(Solid(a), 0, 0)
@@ -141,7 +141,7 @@ init -4 python:
             style.tm_icon_btn.hover_background = Frame(Solid(a), 8, 8)
             style.tm_icon_btn.selected_background = Frame(Solid(a), 8, 8)
             style.tm_seg.selected_background = Frame(Solid(a), 8, 8)
-            style.tm_panel.background = Frame(Solid("#10141d" + op), 0, 0)
+            style.tm_panel.background = Frame(Solid(TM_TOK["bg_panel"] + op), 0, 0)
 
     # ---------------- значки (game/tm_ui/ic/*.png из библиотеки картинок) ----------------
     def tm_ic(name):
@@ -518,12 +518,12 @@ init -4 python:
         except Exception:
             return False
 
-    TM_HINT_COLORS = {"up": "#5ad469", "down": "#ff6b6b", "set": "#6cb6ff", "call": "#d6b8ff", "go": "#8b93a3"}
+    TM_HINT_COLORS = {"up": TM_TOK["ok"], "down": TM_TOK["err"], "set": TM_TOK["info"], "call": TM_TOK["call"], "go": TM_TOK["text_hint"]}
 
     def tm_hint_markup(effs):
         if not effs:
             return u"{color=#5b6373}без изменений{/color}"
-        return u"   ".join(u"{color=%s}%s{/color}" % (TM_HINT_COLORS.get(k, "#c7ccd4"), tm_q(t)) for k, t in effs)
+        return u"   ".join(u"{color=%s}%s{/color}" % (TM_HINT_COLORS.get(k, TM_TOK["text_dim"]), tm_q(t)) for k, t in effs)
 
     def tm_pick_choice(node_name, i):
         # выбрать вариант напрямую (в т.ч. скрытый условием): переход на первый узел блока

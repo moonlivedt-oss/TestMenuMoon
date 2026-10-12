@@ -24,6 +24,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from tmstudio.tokens import TOK
+
 
 @dataclass
 class Step:
@@ -86,8 +88,7 @@ def steps():
         ),
         Step(
             "Обзор игры",
-            "Заголовок меню, цвет акцента, путь к игре и её движок. Пустой акцент — "
-            "общий цвет из манифеста.",
+            "Заголовок меню, цвет акцента, путь к игре и её движок. Пустой акцент — общий цвет из манифеста.",
             _tab(0),
             _go_tab(0),
             mascot="m_think",
@@ -178,11 +179,11 @@ class TourOverlay(QWidget):
         c = self.card = QFrame(self)
         c.setObjectName("tourCard")
         c.setStyleSheet(
-            "#tourCard{background:#161b26;border:1px solid %s;border-radius:16px;}"
+            f"#tourCard{{background:{TOK['bg_card']};border:1px solid {self.accent.name()};border-radius:16px;}}"
             "#tourCard QLabel{background:transparent;}"
-            "#tourTitle{font-size:13pt;font-weight:800;color:#ffffff;}"
-            "#tourText{color:#cdd3dc;font-size:10.5pt;}"
-            "#tourCount{color:#8b93a3;font-size:9pt;}" % self.accent.name()
+            f"#tourTitle{{font-size:13pt;font-weight:800;color:{TOK['text_bright']};}}"
+            f"#tourText{{color:{TOK['text_dim']};font-size:10.5pt;}}"
+            f"#tourCount{{color:{TOK['text_hint']};font-size:9pt;}}"
         )
         c.setFixedWidth(430)
         v = QVBoxLayout(c)
@@ -286,9 +287,7 @@ class TourOverlay(QWidget):
             return None
         r = r if r is not None else w.rect()
         top_left = w.mapTo(self.st, r.topLeft())
-        return QRect(top_left, r.size()).adjusted(
-            -self.PAD, -self.PAD, self.PAD, self.PAD
-        )
+        return QRect(top_left, r.size()).adjusted(-self.PAD, -self.PAD, self.PAD, self.PAD)
 
     def _place(self):
         self.hole = self._target_rect()
@@ -365,4 +364,3 @@ def start_tour(studio, icon_dir, accent, on_finish=None):
     studio._tour = TourOverlay(studio, icon_dir, accent, on_finish)
     studio._tour.start()
     return studio._tour
-

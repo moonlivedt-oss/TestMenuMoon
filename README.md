@@ -244,7 +244,9 @@ engines/
                          их склейка одним файлом zzz_testmenu_engine.rpy
   renpy/                 lang_en.json (английский; 13_lang.rpy собирает tools/gen_renpy_lang.py),
                          zzz_testmenu_translate.rpy (перевод реплик через AutoTranslatorMoon)
-  _shared/               веб-ядро меню (tm_menu_core.js), язык (tm_lang.js), значки, общий блок
+  _shared/               tm_tokens.json — единый набор цветов и размеров меню и студии
+                         (tools/gen_tokens.py собирает 00_tokens.rpy, tm_tokens.js, tmstudio/tokens.py);
+                         веб-ядро меню (tm_menu_core.js), язык (tm_lang.js), значки, общий блок
                          <script> (tm_webinject.py), кодировки HTML, загрузчик модулей (tm_load.py)
   rpgmaker, web, twine   адаптер меню (tm_menu.js) + установщик (inject.py) + scan.py
   godot                  tm_menu.gd (Godot 4), tm_menu3.gd (Godot 3), установщик, чтение .pck

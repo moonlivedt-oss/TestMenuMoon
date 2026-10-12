@@ -38,6 +38,7 @@ from tmkit.paths import CAND_DIR, FROZEN, ana_dir
 from tmkit import naming  # понятные имена переменных (словарь — из движка)
 
 from tmstudio import ROOT, tour
+from tmstudio.tokens import TOK
 from tmstudio.theme import (
     ACCENT, DIRTY_MARK, ENGINE_BADGE, ICON_DIR, ICON_PATH, QSS,
     add_shadow, faded_icon, ibtn, icon, mascot_box,
@@ -340,7 +341,7 @@ class Studio(QMainWindow):
                  "none": "Меню не установлено"}[st]
             )
             it.setData(Qt.ItemDataRole.UserRole, i)
-            it.setForeground(QColor("#e8eaee" if installed else "#8b919d"))
+            it.setForeground(QColor(TOK["text"] if installed else TOK["text_hint"]))
             self.list.addItem(it)
             if i == self.cur:  # clear() сбрасывает выделение — вернуть
                 self.list.setCurrentItem(
@@ -1043,22 +1044,22 @@ class Studio(QMainWindow):
         s = t.lstrip()
         low = t.lower()
         if s.startswith("!"):
-            return "#ff6b6b"
+            return TOK["err"]
         if s.startswith("$"):
             return ACCENT
         if "готово, код" in t:
-            return "#5ad469" if "код 0" in t else "#ff6b6b"
+            return TOK["ok"] if "код 0" in t else TOK["err"]
         if "traceback" in low or "exception" in low:
-            return "#ff6b6b"
+            return TOK["err"]
         if re.search(r"\b(errors?|ошибк\w*)\b", low) and not re.search(
             r"\b(0|no|нет)\b[^\n]*error", low
         ):
-            return "#ff6b6b"
+            return TOK["err"]
         if re.search(r"\b(warnings?|предупрежд\w*)\b", low) and not re.search(
             r"\b0\b[^\n]*warning", low
         ):
-            return "#f0b429"
-        return "#cdd3dc"
+            return TOK["warn"]
+        return TOK["text_dim"]
 
     def _append_colored(self, t):
         esc = html.escape(t).replace(" ", "&nbsp;")

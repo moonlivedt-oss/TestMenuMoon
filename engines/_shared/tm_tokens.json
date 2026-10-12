@@ -1,0 +1,59 @@
+{
+  "_": "Единый набор цветов и размеров меню и студии. Правится этот файл, затем python tools/gen_tokens.py",
+  "color": {
+    "bg_window": "#0b0e14",
+    "bg_panel": "#10141d",
+    "bg_card": "#161b26",
+    "bg_control": "#1e2432",
+    "bg_popup": "#242c3a",
+    "bg_deep": "#080b11",
+    "shade": "#05070b",
+    "line_soft": "#242c3a",
+    "line": "#313a4c",
+    "text_bright": "#ffffff",
+    "text": "#e7ebf2",
+    "text_dim": "#c7ccd4",
+    "text_hint": "#9aa3b4",
+    "text_off": "#5b6373",
+    "accent": "#38e0c8",
+    "on_accent": "#07110f",
+    "on_accent_light": "#e7fffb",
+    "ok": "#5ad469",
+    "warn": "#ffb454",
+    "err": "#ff6b6b",
+    "info": "#6cb6ff",
+    "frozen": "#9fd8ff",
+    "call": "#d6b8ff",
+    "tint_1": "#ffffff0a",
+    "tint_2": "#ffffff12",
+    "tint_3": "#ffffff1e",
+    "tint_4": "#ffffff3a"
+  },
+  "engine": {
+    "renpy": ["Ren'Py", "#c4b5fd"],
+    "rpgmaker": ["RPG Maker", "#7ef0dd"],
+    "unity": ["Unity", "#fdba74"],
+    "godot": ["Godot", "#93c5fd"],
+    "unreal": ["Unreal", "#fca5a5"],
+    "gamemaker": ["GameMaker", "#86efac"],
+    "twine": ["Twine", "#f9a8d4"],
+    "construct": ["Construct", "#fde68a"],
+    "web": ["HTML5", "#c7ccd4"]
+  },
+  "size": {
+    "title": 18,
+    "h": 15,
+    "body": 13,
+    "small": 11
+  },
+  "radius": {
+    "chip": 6,
+    "btn": 8,
+    "card": 12
+  },
+  "space": [4, 8, 12, 16, 24],
+  "motion": {
+    "fast": 120,
+    "base": 180
+  }
+}

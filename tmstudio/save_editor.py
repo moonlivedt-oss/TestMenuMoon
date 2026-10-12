@@ -31,6 +31,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tmkit import saves, engines  # noqa: E402
 from tmkit.saves import diff as sdiff  # noqa: E402
+from tmstudio.tokens import TOK  # noqa: E402
 
 TYPE_NAMES = {
     bool: "флаг",
@@ -354,9 +355,9 @@ class DiffDialog(QDialog):
             for col, text in enumerate((ch.label, sdiff.text(ch.before), sdiff.text(ch.after), self.KIND[ch.kind])):
                 it = QTableWidgetItem(text)
                 if ch.kind == "changed" and col == 2:
-                    it.setForeground(QColor("#5ad469"))
+                    it.setForeground(QColor(TOK["ok"]))
                 elif ch.kind != "changed":
-                    it.setForeground(QColor("#8b93a3"))
+                    it.setForeground(QColor(TOK["text_hint"]))
                 t.setItem(r, col, it)
         v.addWidget(t, 1)
 
