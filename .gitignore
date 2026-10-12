@@ -41,3 +41,6 @@ assets/tm_ui/_mockup.png
 /tweaks/game_*.rpy
 /AUDIT_AND_PLAN.md
 /TOKEN_ECONOMY.txt
+
+# собранная студия (python tools/build_exe.py)
+/TestMenuStudio.exe

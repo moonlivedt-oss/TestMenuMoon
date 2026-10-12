@@ -698,3 +698,40 @@ def test_web_journal_where_and_construct3_present():
     web = open(os.path.join(ROOT, "engines", "web", "tm_menu.js"), encoding="utf-8").read()
     for key in ("function tmwWatch", "where: function", "function tmwConstruct3", "c3_runtimeInterface", "globalVars"):
         assert key in web, key
+
+
+def test_bridge_sync_delivers_commands_once():
+    import json as _j
+    import socket
+    import urllib.request
+    from tmkit import bridge
+
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()
+    b = bridge.Bridge(port)
+    assert b.start()
+    try:
+        def sync(state):
+            req = urllib.request.Request(f"http://127.0.0.1:{port}/sync", _j.dumps(state).encode(),
+                                         {"Content-Type": "text/plain"})
+            with urllib.request.urlopen(req, timeout=5) as r:
+                assert r.headers["Access-Control-Allow-Origin"] == "*"
+                return _j.loads(r.read())
+
+        st = {"id": "g1", "title": "Игра", "rows": [{"k": "a", "v": 1}]}
+        assert sync(st) == {"cmds": []}
+        (cid, got, alive), = b.games()
+        assert cid == "g1" and alive and got["rows"][0]["v"] == 1
+        assert b.send("g1", "set", "a", 5) and b.send("g1", "speed", v=0)
+        assert not b.send("нет такой", "step")
+        assert sync(st)["cmds"] == [{"op": "set", "k": "a", "v": 5}, {"op": "speed", "v": 0}]
+        assert sync(st)["cmds"] == []  # доставляется один раз
+    finally:
+        b.stop()
+    for f, keys in ((("engines", "_shared", "tm_menu_core.js"), ("function bridgeTick", "47820", "Пульт в студии")),
+                    (("engines", "renpy", "engine", "12_bridge.rpy"), ("TMB_PORT = 47820", "def _tm_bridge_periodic"))):
+        text = open(os.path.join(ROOT, *f), encoding="utf-8").read()
+        for k in keys:
+            assert k in text, (f, k)

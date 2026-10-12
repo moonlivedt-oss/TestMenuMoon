@@ -5,13 +5,25 @@
 были захардкожены в каждом скрипте по-своему. Теперь — здесь.
 """
 import os
+import sys
 
 _PKG = os.path.dirname(os.path.abspath(__file__))
-# Корень проекта = папка НАД пакетом tmkit/
-ROOT = os.path.dirname(_PKG)
+# Собранная студия (TestMenuStudio.exe, tools/build_exe.py): код внутри .exe, а всё, что
+# правится и ставится в игры (манифест, engines/, assets/, tools/), — рядом с .exe.
+FROZEN = bool(getattr(sys, "frozen", False))
+# Корень проекта = папка НАД пакетом tmkit/ (у .exe — папка самого .exe)
+ROOT = os.path.dirname(os.path.abspath(sys.executable)) if FROZEN else os.path.dirname(_PKG)
 
-# Данные манифеста живут внутри пакета (генерируются manifest.save_games).
-GAMES_DATA_PATH = os.path.join(_PKG, "games_data.py")
+# Данные манифеста — файл на диске (не модуль): manifest.load_games читает его заново.
+GAMES_DATA_PATH = os.path.join(ROOT, "tmkit", "games_data.py")
+GAMES_EXAMPLE_PATH = os.path.join(ROOT, "tmkit", "games_example.py")
+
+
+def python_cmd(script, *args):
+    """Команда «запустить Python-скрипт»: у .exe — он сам в режиме --py (Python внутри)."""
+    if FROZEN:
+        return [sys.executable, "--py", script, *args]
+    return [sys.executable, script, *args]
 
 # Меню для Ren'Py — источник правды. Исходник разбит на части по разделам
 # (engines/renpy/engine/NN_*.rpy); в игру ставится их склейка одним файлом

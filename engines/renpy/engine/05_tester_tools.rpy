@@ -719,7 +719,7 @@ init -3 python:
                 "extra": [list(e) for e in tm_ui.extra], "jump_mode": tm_ui.jump_mode,
                 "routes": list(tm_ui.routes), "chars": dict(tm_ui.char_names),
                 "auto_mode": tm_ui.auto_mode, "auto_limit": tm_ui.auto_limit,
-                "profile": tm_ui.profile}
+                "profile": tm_ui.profile, "bridge": bool(getattr(tm_ui, "bridge", False))}
 
     def _tm_state_load():
         import io, json, os
@@ -737,6 +737,7 @@ init -3 python:
             tm_ui.favs = [x for x in d.get("favs") or [] if isinstance(x, _TM_STR)]
             tm_ui.watch = [tuple(w) for w in d.get("watch") or [] if len(w) == 2][:12]
             tm_ui.hud_on = bool(d.get("hud_on", True))
+            tm_ui.bridge = bool(d.get("bridge", False))
             if d.get("step") in (1, 5, 10, 50):
                 tm_ui.stat_step = d["step"]
             if d.get("tab") in ("rewind", "stats", "actions", "scanner", "story", "checklist", "settings"):

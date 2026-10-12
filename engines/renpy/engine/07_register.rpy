@@ -115,6 +115,8 @@ init python:
 # zzz_ в имени — наш init 999 идёт последним).
 init 999 python:
     tm_register()
-    _tm_state_load()                         # избранное, HUD, вкладка — с прошлого запуска
+    _tm_state_load()                         # избранное, HUD, вкладка — с прошлого
+    if getattr(tm_ui, "bridge", False):
+        tm_bridge_set(True, False)           # пульт в студии был включён — снова на связи запуска
     _tm_chars_apply()                        # свои имена персонажей
 

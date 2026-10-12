@@ -349,6 +349,22 @@ screen tm_tab_settings():
                 use tmtr_settings
                 use tm_sep
 
+            # ---- Пульт в студии ----
+            hbox:
+                spacing 10
+                use tm_icon("rocket", 30)
+                text "Пульт в студии" style "tm_h" yalign 0.5
+            hbox:
+                spacing 12
+                textbutton ("Пульт: ВКЛ" if _tm_bridge.on else "Пульт: выкл"):
+                    style "tm_btn" text_style "tm_btn_text"
+                    selected _tm_bridge.on
+                    tooltip "Значения и заморозки — из окна «Пульт» студии, не открывая меню поверх игры"
+                    action Function(tm_bridge_set, not _tm_bridge.on)
+                if _tm_bridge.on:
+                    text ("связь со студией есть" if _tm_bridge.ok else "жду студию: открой в ней «Пульт»") style "tm_dim" yalign 0.5
+            use tm_sep
+
             # ---- Внешний вид ----
             hbox:
                 spacing 10

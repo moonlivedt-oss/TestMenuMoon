@@ -7,7 +7,7 @@ games.py — логика (ROOTS, автопоиск лаунчера) пове�
 был детерминированным и не терял структуру.
 """
 
-import os, re, copy, shutil, importlib
+import os, re, copy, shutil
 
 from tmkit.paths import GAMES_DATA_PATH
 
@@ -145,9 +145,13 @@ def save_games(games, G, ACCENT, path=GAMES_DATA_PATH):
     os.replace(tmp, path)
 
 
-def load_games():
-    """Вернуть (GAMES-копия, G, ACCENT), свежесчитанные с диска."""
-    from tmkit import games_data
-
-    importlib.reload(games_data)
-    return copy.deepcopy(games_data.GAMES), games_data.G, games_data.ACCENT
+def load_games(path=GAMES_DATA_PATH):
+    """Вернуть (GAMES, G, ACCENT), свежесчитанные с диска. Файл исполняется как данные,
+    а не импортируется: так он всегда тот, что рядом с проектом (и у собранного .exe)."""
+    ns = {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            exec(compile(f.read(), path, "exec"), ns)
+    except FileNotFoundError:
+        return {}, "", "#38e0c8"
+    return copy.deepcopy(ns.get("GAMES", {})), ns.get("G", ""), ns.get("ACCENT", "#38e0c8")

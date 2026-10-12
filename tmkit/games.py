@@ -11,7 +11,9 @@ GAMES/ROOTS — снимок манифеста на момент импорта
 
 import os, re, glob
 
-from tmkit.games_data import GAMES, G, ACCENT  # noqa: F401  (реэкспорт)
+from tmkit.manifest import load_games
+
+GAMES, G, ACCENT = load_games()  # снимок манифеста на момент импорта (см. выше)
 
 # производное: индекс -> папка game/
 ROOTS = {i: g["root"] for i, g in GAMES.items()}

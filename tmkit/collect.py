@@ -6,10 +6,10 @@
 Результат — дерево .rpy в ANA_BASE/game_N (короткий путь ради Windows MAX_PATH).
 """
 
-import os, sys, glob, shutil, subprocess
+import os, glob, shutil, subprocess
 
 from tmkit.games import ROOTS
-from tmkit.paths import ANA_BASE, UNRPYC
+from tmkit.paths import ANA_BASE, UNRPYC, python_cmd
 from tmkit import rpa
 from tmkit import report
 
@@ -49,7 +49,7 @@ def collect(i):
     if os.path.exists(UNRPYC):
         # вывод unrpyc — utf-8 с именами файлов игры; дефолтная cp1251 на нём падает
         r = subprocess.run(
-            [sys.executable, UNRPYC, ana],
+            python_cmd(UNRPYC, ana),
             capture_output=True,
             encoding="utf-8",
             errors="replace",

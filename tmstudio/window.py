@@ -34,7 +34,7 @@ from tmkit import engines  # авто-определение движка -> а�
 from tmkit import analysis  # разбор строк кандидатов -> пары для таблицы статов
 from tmkit import deploy as tmdeploy  # статус установки: нет / устарело / актуально
 from tmkit import generate
-from tmkit.paths import CAND_DIR, ana_dir
+from tmkit.paths import CAND_DIR, FROZEN, ana_dir
 from tmkit import naming  # понятные имена переменных (словарь — из движка)
 
 from tmstudio import ROOT, tour
@@ -209,6 +209,14 @@ class Studio(QMainWindow):
         )
         b_lib.clicked.connect(self._open_library)
         lv.addWidget(b_lib)
+        b_remote = ibtn(
+            "Пульт…",
+            "rocket",
+            "Управлять запущенной игрой из студии: значения, заморозки, темп, шаг кадра "
+            "(в меню игры включи «Пульт в студии»)",
+        )
+        b_remote.clicked.connect(self._open_remote)
+        lv.addWidget(b_remote)
         b_saves = ibtn("Сохранения…", "save", "Редактор сохранений выбранной игры: Ren'Py, RPG Maker, Unity (PlayerPrefs, JSON), Godot")
         b_saves.clicked.connect(self._open_saves)
         lv.addWidget(b_saves)
@@ -801,6 +809,14 @@ class Studio(QMainWindow):
         self._library_changed()
         self._log_line(f"$ обновлено меню: {ok}" + (f", ошибок: {len(errors)}" if errors else ""))
 
+    def _open_remote(self):
+        from tmstudio.remote import RemoteDialog
+
+        if getattr(self, "_remote", None) is None:
+            self._remote = RemoteDialog(self)
+        self._remote.show()
+        self._remote.raise_()
+
     def _open_library(self):
         from tmstudio.library import LibraryDialog
 
@@ -978,7 +994,10 @@ class Studio(QMainWindow):
         self._set_busy(True)
         self._log_line(f"$ python tm.py {script} {' '.join(args)}")
         self.proc.setWorkingDirectory(ROOT)
-        self.proc.start(sys.executable, [TM_PY, script] + args)
+        if FROZEN:  # собранная студия: команды tm.py выполняет сам .exe (--tm)
+            self.proc.start(sys.executable, ["--tm", script] + args)
+        else:
+            self.proc.start(sys.executable, [TM_PY, script] + args)
 
     # ---- лог: цвет по типу строки + «липкий» автоскролл ----
     def _at_bottom(self):

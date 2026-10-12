@@ -196,6 +196,65 @@
       }], ["Очистить", function () { changelog = []; showJournal(); }]]);
   }
 
+  // --- пульт в студии (tmkit/bridge.py): раз в 0.7 с отдаём значения, забираем команды.
+  // Включается во вкладке «Игра» и запоминается для этой игры; без студии — опрос раз в 3 с.
+  var BKEY = LSKEY + "_bridge_" + (location.pathname || "");
+  var BR = { on: false, ok: false, id: "web-" + Math.random().toString(36).slice(2, 10), timer: null };
+  function bridgeState() {
+    var rows = [], by = {};
+    try { by = rowsByKey(); } catch (e) {}
+    Object.keys(by).slice(0, 600).forEach(function (k) {
+      var r = by[k], v;
+      try { v = r.get(); } catch (e) { return; }
+      var t = typeof v;
+      if (!(t === "number" || t === "string" || t === "boolean")) return;
+      var cut = k.indexOf("/");
+      rows.push({ k: k, sec: k.slice(0, cut), name: r.name, type: r.type, v: v, fz: !!frozen[k] });
+    });
+    var caps = ["set", "freeze"];
+    if (A.speed) caps.push("speed");
+    if (A.speed === true || A.step) caps.push("step");
+    return { id: BR.id, title: document.title || A.title, engine: A.title, caps: caps, speed: speed, rows: rows };
+  }
+  function bridgeApply(cmds) {
+    var by = null;
+    (cmds || []).forEach(function (c) {
+      try {
+        if (c.op === "speed") { setSpeed(Number(c.v)); return; }
+        if (c.op === "step") { frameStep(); return; }
+        by = by || rowsByKey();
+        var r = by[c.k];
+        if (!r) return;
+        if (c.op === "set") {
+          var v = r.type === "num" ? Number(c.v) : r.type === "bool" ? (c.v === true || c.v === "true" || c.v === 1) : String(c.v);
+          jMark(c.k, "пульт"); r.set(v);
+          if (frozen[c.k]) frozen[c.k].v = r.get();
+        } else if (c.op === "freeze") {
+          frozen[c.k] = { v: r.get(), set: r.set, get: r.get }; startTick();
+        } else if (c.op === "unfreeze") {
+          delete frozen[c.k];
+        }
+      } catch (e) { console.error("[TM] пульт", e); }
+    });
+    if (overlay && cmds && cmds.length) live.forEach(function (f) { try { f(); } catch (e) {} });
+  }
+  function bridgeTick() {
+    BR.timer = null;
+    if (!BR.on) return;
+    var body;
+    try { body = JSON.stringify(A.ready() ? bridgeState() : { id: BR.id, title: document.title, engine: A.title, rows: [] }); } catch (e) { body = "{}"; }
+    fetch("http://127.0.0.1:47820/sync", { method: "POST", body: body, headers: { "Content-Type": "text/plain" } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { BR.ok = true; bridgeApply(d.cmds); BR.timer = setTimeout(bridgeTick, 700); })
+      .catch(function () { BR.ok = false; BR.timer = setTimeout(bridgeTick, 3000); });
+  }
+  function setBridge(on) {
+    BR.on = on;
+    try { if (on) localStorage.setItem(BKEY, "1"); else localStorage.removeItem(BKEY); } catch (e) {}
+    if (on && !BR.timer) bridgeTick();
+  }
+  try { if (localStorage.getItem(BKEY)) setBridge(true); } catch (e) {}
+
   // ------------------------------------------------------------------ стиль
   function injectCss() {
     if (document.getElementById("tm-style")) return;
@@ -504,6 +563,14 @@
         });
       }
     }
+    section(list, "Пульт в студии");
+    var bb = el("div", "tm-scanbar");
+    var bbtn = mkBtn(bb, BR.on ? "Пульт: вкл" : "Пульт: выкл", function () { setBridge(!BR.on); rerender(); });
+    if (BR.on) { bbtn.style.background = ACCENT; bbtn.style.color = "#07110f"; }
+    bbtn.title = "Значения, заморозки, темп и шаг кадра — из окна «Пульт» студии (второй монитор)";
+    list.appendChild(bb);
+    list.appendChild(el("div", "tm-msg", BR.on ? (BR.ok ? "Связь со студией есть." : "Жду студию: открой в ней «Пульт».")
+      : "Включи, чтобы управлять игрой из студии, не открывая меню поверх игры."));
     section(list, "Профиль игры");
     var pr = loadProfile(), prb = el("div", "tm-scanbar");
     mkBtn(prb, "Сохранить профиль", function () {

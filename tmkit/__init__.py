@@ -23,8 +23,9 @@
 import os as _os
 import shutil as _shutil
 
+from tmkit.paths import GAMES_DATA_PATH as _DATA, GAMES_EXAMPLE_PATH as _EXAMPLE
+
 # Свой манифест (tmkit/games_data.py) — личный и в git не идёт. Свежий клон получает
 # копию примера с тестовыми играми (tmkit/games_example.py), дальше правит студия.
-_here = _os.path.dirname(_os.path.abspath(__file__))
-if not _os.path.exists(_os.path.join(_here, "games_data.py")):
-    _shutil.copyfile(_os.path.join(_here, "games_example.py"), _os.path.join(_here, "games_data.py"))
+if not _os.path.exists(_DATA) and _os.path.exists(_EXAMPLE):
+    _shutil.copyfile(_EXAMPLE, _DATA)

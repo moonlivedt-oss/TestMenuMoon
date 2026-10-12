@@ -710,6 +710,7 @@ init -5 python:
             _tm_auto_watch()
         if tm_ui.frozen and not store.main_menu:
             _tm_apply_frozen()
+        _tm_bridge_periodic()
 
     def tm_labels(q, limit=40):
         # Метки сценария, в имени которых есть q (для «Перейти к метке»).
