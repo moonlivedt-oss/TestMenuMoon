@@ -172,7 +172,21 @@ def cmd_library(args):
 
 
 def cmd_saves(args):
-    """Редактор сохранений (окно PyQt6): файл сейва или выбор игры в окне."""
+    """Редактор сохранений (окно PyQt6): файл сейва или выбор игры в окне.
+    С --diff — без окна: что изменилось между двумя сейвами."""
+    if args.diff:
+        from tmkit import saves
+        from tmkit.saves import diff as sdiff
+
+        if not args.file:
+            print("[X] укажи два файла:  tm.py saves A --diff B")
+            return 2
+        changes = sdiff.diff(sdiff.snapshot(saves.open_save(args.file)), sdiff.snapshot(saves.open_save(args.diff)))
+        kinds = {"changed": "~", "added": "+", "removed": "-"}
+        for c in changes:
+            print(f"{kinds[c.kind]} {c.label}: {sdiff.text(c.before)} -> {sdiff.text(c.after)}")
+        print(f"\nразличий: {len(changes)}")
+        return 0
     try:
         from tmstudio import save_editor
     except ImportError as e:
@@ -369,6 +383,7 @@ def build_parser():
         description="редактор сохранений: Ren'Py, RPG Maker, Unity, Godot, persistent Ren'Py",
     )
     sp.add_argument("file", nargs="?", help="файл сейва (без него — выбрать игру в окне)")
+    sp.add_argument("--diff", metavar="ДРУГОЙ", help="без окна: что изменилось от файла к ДРУГОМУ")
     sp.set_defaults(func=cmd_saves)
 
     sp = sub.add_parser(

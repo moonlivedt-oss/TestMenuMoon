@@ -200,3 +200,29 @@ def test_saves_coerce_keeps_big_ints():
     assert saves.coerce(1, "12345678901234567891") == 12345678901234567891
     assert saves.coerce(1, "1 000") == 1000 and saves.coerce(1, "2,7") == 2
     assert saves.coerce(1.0, "2,5") == 2.5 and saves.coerce(True, "нет") is False
+
+
+def test_saves_snapshot_diff_and_cli():
+    from tmkit.saves import diff as sdiff
+    from tmkit import saves
+
+    with tempfile.TemporaryDirectory() as tmp:
+        a, b = os.path.join(tmp, "a.json"), os.path.join(tmp, "b.json")
+        open(a, "w", encoding="utf-8").write('{"gold": 5, "hero": {"hp": 10, "name": "Ann"}, "old": 1}')
+        open(b, "w", encoding="utf-8").write('{"gold": 50, "hero": {"hp": 10, "name": "Анна"}, "new": true}')
+        ch = sdiff.diff(sdiff.snapshot(saves.open_save(a)), sdiff.snapshot(saves.open_save(b)))
+        got = {(c.label, c.kind, sdiff.text(c.before), sdiff.text(c.after)) for c in ch}
+        assert got == {("gold", "changed", "5", "50"), ("hero.name", "changed", "Ann", "Анна"),
+                       ("new", "added", "—", "true"), ("old", "removed", "1", "—")}, got
+        assert [c.kind for c in ch] == ["changed", "changed", "added", "removed"]
+        # снимок на диске переживает перезапуск
+        snap = sdiff.snapshot(saves.open_save(a))
+        sdiff.save_snap(a, snap)
+        assert sdiff.load_snap(a) == snap
+        os.remove(sdiff._snap_path(a))  # снимки живут в build/ — тестовый не оставляем
+        import io as _io, contextlib
+
+        buf = _io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            assert tm.main(["saves", a, "--diff", b]) == 0
+        assert "~ gold: 5 -> 50" in buf.getvalue() and "различий: 4" in buf.getvalue()

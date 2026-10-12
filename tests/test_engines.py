@@ -663,6 +663,15 @@ def test_rpgmaker_unpack_keeps_japanese_names():
         assert os.path.isfile(os.path.join(pkg, "js", "plugins", "TM_Menu.js"))
 
 
+def test_web_game_stays_web_after_menu_install():
+    """В тексте меню есть «SugarCube»: после установки HTML5-игра не должна стать «Twine»."""
+    with tempfile.TemporaryDirectory() as tmp:
+        open(os.path.join(tmp, "index.html"), "w").write("<html><body><canvas></canvas></body></html>")
+        assert engines.detect_engine(tmp).key == "web"
+        engines.REGISTRY["web"].deploy(tmp)
+        assert engines.detect_engine(tmp).key == "web"
+
+
 def test_web_unpacks_packed_nwjs_game():
     import zipfile
 

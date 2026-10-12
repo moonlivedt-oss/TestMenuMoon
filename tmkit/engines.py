@@ -12,6 +12,7 @@ Twine, Godot, Unity, Unreal) находят данные в рантайме: и
 
 import glob
 import os
+import re
 import sys
 from dataclasses import dataclass
 from typing import Callable, Optional, Sequence
@@ -108,6 +109,8 @@ RENPY = Engine(
 
 # ------------------------------------------------------------------ Twine
 _TWINE_MARKS = (b"<tw-storydata", b"<tw-story", b"SugarCube")
+# наш же блок меню (в нём есть слово SugarCube) — не повод считать игру историей Twine
+_OUR_BLOCK = re.compile(rb"<!-- TM_\w+_MENU_START -->.*?<!-- TM_\w+_MENU_END -->", re.S)
 
 
 def _is_twine_html(path):
@@ -116,6 +119,7 @@ def _is_twine_html(path):
             data = f.read()
     except OSError:
         return False
+    data = _OUR_BLOCK.sub(b"", data)
     return any(m in data for m in _TWINE_MARKS)
 
 

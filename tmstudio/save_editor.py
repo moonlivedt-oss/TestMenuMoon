@@ -30,6 +30,7 @@ from PyQt6.QtWidgets import (
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tmkit import saves, engines  # noqa: E402
+from tmkit.saves import diff as sdiff  # noqa: E402
 
 TYPE_NAMES = {
     bool: "флаг",
@@ -92,6 +93,17 @@ class SaveEditor(QDialog):
         self.status = QLabel("", objectName="dim")
         self.status.setWordWrap(True)
         bottom.addWidget(self.status, 1)
+        b_snap = QPushButton("Снимок")
+        b_snap.setToolTip("Запомнить все значения этого сейва (снимок хранится и после закрытия студии)")
+        b_snap.clicked.connect(self._snapshot)
+        b_cmp = QPushButton("Сравнить со снимком")
+        b_cmp.setToolTip("Перечитать сейв с диска и показать, что изменилось с момента снимка")
+        b_cmp.clicked.connect(self._compare_snapshot)
+        b_cmp_file = QPushButton("Сравнить с файлом…")
+        b_cmp_file.setToolTip("Показать разницу между этим сейвом и другим файлом")
+        b_cmp_file.clicked.connect(self._compare_file)
+        for b in (b_snap, b_cmp, b_cmp_file):
+            bottom.addWidget(b)
         b_undo = QPushButton("Отменить правки")
         b_undo.clicked.connect(self._open_current)
         self.b_save = QPushButton("Сохранить")
@@ -247,6 +259,49 @@ class SaveEditor(QDialog):
             "Изменено значений: %d — «Сохранить», чтобы записать." % len(self.dirty)
         )
 
+    # ---------------------------------------------------------- снимки и сравнение
+    def _target(self):
+        i = self.combo.currentIndex()
+        return self.targets[i][1] if 0 <= i < len(getattr(self, "targets", [])) else None
+
+    def _snapshot(self):
+        if not self.doc:
+            self.status.setText("Сначала открой сейв.")
+            return
+        snap = sdiff.snapshot(self.doc)
+        sdiff.save_snap(self._target(), snap)
+        self.status.setText(
+            "Снимок: %d значений. Поиграй, сохрани игру в этот же слот и нажми «Сравнить со снимком»." % len(snap)
+        )
+
+    def _compare_snapshot(self):
+        target = self._target()
+        old = sdiff.load_snap(target) if target is not None else None
+        if old is None:
+            self.status.setText("У этого сейва ещё нет снимка — нажми «Снимок».")
+            return
+        try:
+            new = sdiff.snapshot(saves.open_any(target))
+        except Exception as e:
+            self.status.setText("Не открыть: %s" % e)
+            return
+        DiffDialog(self, "Снимок -> сейв сейчас", sdiff.diff(old, new)).exec()
+
+    def _compare_file(self):
+        if not self.doc:
+            self.status.setText("Сначала открой сейв.")
+            return
+        p, _f = QFileDialog.getOpenFileName(self, "С каким сейвом сравнить", os.path.dirname(str(self._target() or "")))
+        if not p:
+            return
+        try:
+            other = sdiff.snapshot(saves.open_save(p))
+        except Exception as e:
+            self.status.setText("Не открыть: %s" % e)
+            return
+        title = "%s -> %s" % (os.path.basename(str(self._target())), os.path.basename(p))
+        DiffDialog(self, title, sdiff.diff(sdiff.snapshot(self.doc), other)).exec()
+
     def _save(self):
         if not self.doc or not self.dirty:
             self.status.setText("Нечего сохранять.")
@@ -265,6 +320,55 @@ class SaveEditor(QDialog):
             "Записано правок: %d. %s Перезагрузи сохранение в игре."
             % (n, (note + ".") if note else "")
         )
+
+
+class DiffDialog(QDialog):
+    """Таблица изменений: поле, было, стало (новые и пропавшие значения — отдельно)."""
+
+    KIND = {"changed": "изменилось", "added": "появилось", "removed": "пропало"}
+
+    def __init__(self, parent, title, changes):
+        super().__init__(parent)
+        self.setWindowTitle("Что изменилось: " + title)
+        self.resize(900, 560)
+        v = QVBoxLayout(self)
+        n = {k: sum(1 for c in changes if c.kind == k) for k in self.KIND}
+        v.addWidget(QLabel(
+            "Изменилось: %d, появилось: %d, пропало: %d." % (n["changed"], n["added"], n["removed"])
+            if changes else "Различий нет.",
+            objectName="dim",
+        ))
+        flt = QLineEdit()
+        flt.setPlaceholderText("фильтр по имени…")
+        flt.setClearButtonEnabled(True)
+        v.addWidget(flt)
+        t = QTableWidget(len(changes), 4)
+        t.setHorizontalHeaderLabels(["Имя", "Было", "Стало", ""])
+        t.verticalHeader().setVisible(False)
+        t.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        hh = t.horizontalHeader()
+        hh.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        for c in (1, 2, 3):
+            hh.setSectionResizeMode(c, QHeaderView.ResizeMode.ResizeToContents)
+        for r, ch in enumerate(changes):
+            for col, text in enumerate((ch.label, sdiff.text(ch.before), sdiff.text(ch.after), self.KIND[ch.kind])):
+                it = QTableWidgetItem(text)
+                if ch.kind == "changed" and col == 2:
+                    it.setForeground(QColor("#5ad469"))
+                elif ch.kind != "changed":
+                    it.setForeground(QColor("#8b93a3"))
+                t.setItem(r, col, it)
+        v.addWidget(t, 1)
+
+        def apply(q):
+            q = q.strip().lower()
+            for r in range(t.rowCount()):
+                t.setRowHidden(r, bool(q) and q not in t.item(r, 0).text().lower())
+
+        flt.textChanged.connect(apply)
+        b = QPushButton("Закрыть")
+        b.clicked.connect(self.accept)
+        v.addWidget(b, 0, Qt.AlignmentFlag.AlignRight)
 
 
 def main(path=None):

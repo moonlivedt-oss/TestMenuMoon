@@ -6,9 +6,10 @@
 
 import os, sys, re, html, traceback
 
-from PyQt6.QtCore import Qt, QProcess, QProcessEnvironment, QSettings, QSize, QTimer
+from PyQt6.QtCore import Qt, QProcess, QProcessEnvironment, QSettings, QSize, QThread, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QIcon, QPixmap, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
+    QPushButton,
     QApplication,
     QMainWindow,
     QWidget,
@@ -90,6 +91,7 @@ class Studio(QMainWindow):
             self.list.setCurrentRow(0)
         if self.settings.value("tour_done", False, type=bool) is not True:
             QTimer.singleShot(500, self.start_tour)
+        QTimer.singleShot(1500, self._check_library)
 
     def start_tour(self):
         def done():
@@ -144,6 +146,26 @@ class Studio(QMainWindow):
         self.b_tour.clicked.connect(self.start_tour)
         head.addWidget(self.b_tour, 0, Qt.AlignmentFlag.AlignTop)
         lv.addLayout(head)
+        # плашка «меню устарело в N играх» — проверка библиотеки при запуске (_check_library)
+        self.update_bar = QWidget(objectName="updatebar")
+        self.update_bar.setStyleSheet(
+            "#updatebar { background: rgba(240,180,41,0.12); border: 1px solid rgba(240,180,41,0.55);"
+            " border-radius: 12px; }"
+        )
+        ub = QHBoxLayout(self.update_bar)
+        ub.setContentsMargins(10, 6, 6, 6)
+        self.update_lbl = QLabel("")
+        self.update_lbl.setWordWrap(True)
+        ub.addWidget(self.update_lbl, 1)
+        self.b_update = QPushButton("Обновить")
+        self.b_update.setObjectName("primary")
+        self.b_update.clicked.connect(self._update_stale)
+        b_hide = ibtn("", "close", "Скрыть до следующего запуска")
+        b_hide.clicked.connect(self.update_bar.hide)
+        ub.addWidget(self.b_update)
+        ub.addWidget(b_hide)
+        self.update_bar.hide()
+        lv.addWidget(self.update_bar)
         lv.addWidget(QLabel("ИГРЫ ИЗ МАНИФЕСТА", objectName="section"))
         self.list_filter = QLineEdit()
         self.list_filter.setPlaceholderText("фильтр игр…")
@@ -737,6 +759,48 @@ class Studio(QMainWindow):
         self._commit_structure(lambda gs: manifest.add_game(gs, root, title=title, index=idx))
         return idx
 
+    # ------------------------------------------------------------ автопроверка библиотеки
+    def _check_library(self):
+        """Тихо проверить папку библиотеки (из «Библиотеки игр…») и игры манифеста: где меню
+        устарело — плашка над списком. Проверка в фоне: статус игр читает файлы с диска."""
+        if not self.settings.value("library_autocheck", True, type=bool):
+            return
+        folder = self.settings.value("library_dir", "") or ""
+        self._lib_worker = _LibraryCheck(folder, dict(self.games), self)
+        self._lib_worker.done.connect(self._library_checked)
+        self._lib_worker.start()
+
+    def _library_checked(self, stale):
+        self.stale = stale
+        if not stale:
+            self.update_bar.hide()
+            return
+        names = ", ".join(g.name for g in stale[:3]) + (" …" if len(stale) > 3 else "")
+        self.update_lbl.setText(f"Меню устарело в играх: {len(stale)} ({names})")
+        self.update_bar.show()
+
+    def _update_stale(self):
+        from PyQt6.QtWidgets import QApplication
+        from tmkit import library
+
+        if self._dirty:
+            self._save_manifest()
+        ok, errors = 0, []
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            for g in getattr(self, "stale", []):
+                try:
+                    self._log_line(f"$ обновление: {library.install(g)}")
+                    ok += 1
+                except Exception as e:
+                    errors.append(f"{g.name}: {e}")
+                    self._log_line(f"! обновление {g.name}: {e}")
+        finally:
+            QApplication.restoreOverrideCursor()
+        self.update_bar.hide()
+        self._library_changed()
+        self._log_line(f"$ обновлено меню: {ok}" + (f", ошибок: {len(errors)}" if errors else ""))
+
     def _open_library(self):
         from tmstudio.library import LibraryDialog
 
@@ -1000,6 +1064,41 @@ class Studio(QMainWindow):
             self.proc.waitForFinished(1500)
         self.settings.setValue("geometry", self.saveGeometry())
         e.accept()
+
+
+class _LibraryCheck(QThread):
+    """Фоновая проверка: устаревшие меню в папке библиотеки и в играх манифеста."""
+
+    done = pyqtSignal(list)
+
+    def __init__(self, folder, games, parent=None):
+        super().__init__(parent)
+        self.folder, self.games = folder, games
+
+    def run(self):
+        from tmkit import library
+
+        stale, seen = [], set()
+        try:
+            found = library.find_games(self.folder, games=self.games) if self.folder and os.path.isdir(self.folder) else []
+            # игры манифеста вне папки библиотеки — тоже
+            for i, g in sorted(self.games.items()):
+                root = g.get("root", "")
+                if root and os.path.exists(root) and not any(
+                    os.path.normcase(f.target) == os.path.normcase(os.path.abspath(root)) for f in found
+                ):
+                    eng = engines.detect_engine(root)
+                    if eng is not None:
+                        found.append(library.Found(g.get("title") or root, root, root, eng,
+                                                   library.status_of(eng, root, generate.render_game(i, g) if eng.key == "renpy" else None), i))
+            for f in found:
+                key = os.path.normcase(os.path.abspath(f.target))
+                if f.status == "stale" and key not in seen:
+                    seen.add(key)
+                    stale.append(f)
+        except Exception:
+            stale = []
+        self.done.emit(stale)
 
 
 def main():
