@@ -26,15 +26,27 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.normpath(os.path.join(HERE, "..", ".."))
+sys.path.insert(0, os.path.join(os.path.dirname(HERE), "_shared"))
+import tm_load  # noqa: E402
+
+tm_load.use_tmkit()
 BEPINEX = os.path.join(ROOT, "tools", "unity", "BepInEx_IL2CPP")
 EXPLORER = os.path.join(ROOT, "tools", "unity", "UnityExplorer")
 BEPINEX5 = os.path.join(ROOT, "tools", "unity", "BepInEx5_x64")
+BEPINEX5_X86 = os.path.join(ROOT, "tools", "unity", "BepInEx5_x86")  # 32-битные Mono-игры
 EXPLORER5 = os.path.join(ROOT, "tools", "unity", "UnityExplorer_Mono")
 MONO_DLL = "TestMenu.Mono.dll"
 # своё меню (engines/unity/plugin, собрать: dotnet build -c Release)
 MENU_DLL = os.path.join(HERE, "plugin", "bin", "TestMenu.Unity.dll")
 LIST = "tm_unity_files.txt"
 LOADERS = ("winhttp.dll", "version.dll")
+
+
+def _words_json():
+    # tm_words.json — тот же словарь, что у меню Godot и движка Ren'Py
+    from tmkit import naming
+
+    return naming.words_json()
 
 
 def game_dir(path):
@@ -106,59 +118,55 @@ def _mono_signature():
     """Что должно лежать в игре: исходник меню + словарь (для is_current)."""
     import hashlib
 
-    sys.path.insert(0, os.path.join(ROOT, "engines", "godot"))
-    import inject as godot_inject
-
     with open(os.path.join(HERE, "mono", "TestMenuMono.cs"), "rb") as f:
         src = f.read()
-    return hashlib.sha1(src + godot_inject._words_json().encode("utf-8")).hexdigest()
+    return hashlib.sha1(src + _words_json().encode("utf-8")).hexdigest()
 
 
 def _deploy_mono(d):
-    if not is_64bit(d):
-        raise ValueError("32-битная игра: нужен BepInEx 5 x86 (в tools/unity есть только x64)")
+    # загрузчик (winhttp.dll) должен совпадать с разрядностью игры; сам плагин — AnyCPU
+    bits = "x64" if is_64bit(d) else "x86"
+    bepinex5 = BEPINEX5 if bits == "x64" else BEPINEX5_X86
     managed = managed_dir(d)
     if not managed:
         raise ValueError("нет <игра>_Data/Managed — это не Mono-игра Unity")
-    if not os.path.isdir(BEPINEX5) or not os.path.isdir(EXPLORER5):
-        raise FileNotFoundError("нет tools/unity/BepInEx5_x64 — запусти tools/fetch_unity_tools.py")
+    if not os.path.isdir(bepinex5) or not os.path.isdir(EXPLORER5):
+        raise FileNotFoundError(
+            f"нет tools/unity/{os.path.basename(bepinex5)} — запусти tools/fetch_unity_tools.py"
+        )
     if not os.path.exists(os.path.join(d, LIST)):
         for ld in LOADERS:
             if os.path.exists(os.path.join(d, ld)):
                 raise ValueError(f"в игре уже есть {ld} (свой загрузчик модов) — не трогаю")
-    sys.path.insert(0, HERE)
-    import mono_build
+    mono_build = tm_load.load("unity", "mono_build.py")
 
     menu = os.path.join(d, "BepInEx", "plugins", "TestMenu")
     os.makedirs(menu, exist_ok=True)
-    ok, log = mono_build.build(managed, os.path.join(BEPINEX5, "BepInEx", "core"), os.path.join(menu, MONO_DLL))
+    ok, log = mono_build.build(managed, os.path.join(bepinex5, "BepInEx", "core"), os.path.join(menu, MONO_DLL))
     if not ok:
         with open(os.path.join(menu, "build_error.txt"), "w", encoding="utf-8") as f:
             f.write(log)
         raise ValueError("меню не собралось под эту игру — подробности в BepInEx/plugins/TestMenu/build_error.txt")
     added = ["BepInEx/plugins/TestMenu/" + MONO_DLL]
-    for name in os.listdir(BEPINEX5):
+    for name in os.listdir(bepinex5):
         if name in (".version", "changelog.txt"):
             continue
-        s = os.path.join(BEPINEX5, name)
+        s = os.path.join(bepinex5, name)
         if os.path.isdir(s):
             _copy_tree(s, d, name, added)
         else:
             shutil.copy2(s, os.path.join(d, name))
             added.append(name)
     _copy_tree(os.path.join(EXPLORER5, "plugins"), d, "BepInEx/plugins", added)
-    sys.path.insert(0, os.path.join(ROOT, "engines", "godot"))
-    import inject as godot_inject
-
     with open(os.path.join(menu, "tm_words.json"), "w", encoding="utf-8") as f:
-        f.write(godot_inject._words_json())
+        f.write(_words_json())
     with open(os.path.join(menu, "tm_source.sha1"), "w", encoding="utf-8") as f:
         f.write(_mono_signature())
     added += ["BepInEx/plugins/TestMenu/tm_words.json", "BepInEx/plugins/TestMenu/tm_source.sha1"]
     with open(os.path.join(d, LIST), "w", encoding="utf-8") as f:
         f.write("\n".join(sorted(set(added))) + "\n")
     v = unity_version(d) or "?"
-    return (f"{d}: меню + BepInEx 5 + UnityExplorer установлены (Unity {v}, Mono). "
+    return (f"{d}: меню + BepInEx 5 + UnityExplorer установлены (Unity {v}, Mono {bits}). "
             "В игре: Shift+T / F9 — меню, F7 — UnityExplorer")
 
 
@@ -237,11 +245,8 @@ def _deploy(d):
     if has_menu:
         shutil.copy2(MENU_DLL, os.path.join(menu, "TestMenu.Unity.dll"))
         added.append("BepInEx/plugins/TestMenu/TestMenu.Unity.dll")
-    sys.path.insert(0, os.path.join(ROOT, "engines", "godot"))
-    import inject as godot_inject  # tm_words.json — тот же словарь, что у Godot
-
     with open(os.path.join(menu, "tm_words.json"), "w", encoding="utf-8") as f:
-        f.write(godot_inject._words_json())
+        f.write(_words_json())
     added.append("BepInEx/plugins/TestMenu/tm_words.json")
     with open(os.path.join(d, LIST), "w", encoding="utf-8") as f:
         f.write("\n".join(sorted(set(added))) + "\n")
@@ -297,11 +302,8 @@ def is_current(path):
         ):
             if a.read() != b.read():
                 return False
-        sys.path.insert(0, os.path.join(ROOT, "engines", "godot"))
-        import inject as godot_inject
-
         with open(os.path.join(menu, "tm_words.json"), encoding="utf-8") as f:
-            return f.read() == godot_inject._words_json()
+            return f.read() == _words_json()
     except (ValueError, OSError):
         return False
 

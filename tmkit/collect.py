@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Ядро collect_sources: подготовить исходники игры для анализа.
+"""Ядро tm.py collect: подготовить исходники игры для анализа.
 
 Для игры N: распаковать её .rpa (только скрипты), скопировать уже лежащие .rpy/.rpyc,
 затем декомпилировать вендоренным unrpyc те .rpyc, у которых нет парного .rpy.
 Результат — дерево .rpy в ANA_BASE/game_N (короткий путь ради Windows MAX_PATH).
-Логика вынесена сюда, чтобы root collect_sources.py был тонкой обёрткой.
 """
 
 import os, sys, glob, shutil, subprocess

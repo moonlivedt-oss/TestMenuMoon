@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """Ядро deploy/uninstall: разложить движок+data (+UI) в game/ и снести меню.
 
-Логика вынесена сюда из плоских скриптов deploy.py / uninstall.py, чтобы:
-  * root-обёртки были по-настоящему тонкими (как gen_data → generate);
-  * основную работу можно было юнит-тестить на temp-папке без манифеста
-    (deploy_to / remove_from работают по путям, deploy / uninstall — по индексу).
+CLI — tm.py deploy / uninstall / quick. Работа по путям (deploy_to, quick_install,
+remove_from) юнит-тестится на temp-папке без манифеста; deploy / uninstall — по индексу игры.
 """
 
 import os, re, glob, shutil
 
 from tmkit.games import ROOTS
-from tmkit.paths import BUILD, ENGINE_SRC, ROOT, TRANSLATE_SRC, game_data_file
+from tmkit.paths import (
+    BUILD, ENGINE_SRC, ROOT, TRANSLATE_SRC, game_data_file, read_source, source_stamp,
+)
 from tmkit import generate, report
 
 ENGINE_NAME = "zzz_testmenu_engine.rpy"
@@ -47,15 +47,16 @@ _SRC_CACHE = {}
 
 
 def _src_text(path):
-    """_text() исходника движка с кэшем по mtime: студия спрашивает статус каждой игры
-    при каждом обновлении списка, а движок весит ~100 КБ."""
-    try:
-        st = os.stat(path)
-        key = (path, st.st_mtime_ns, st.st_size)
-    except OSError:
+    """Текст исходника (файл или папка частей) с едиными концами строк и кэшем по mtime:
+    студия спрашивает статус каждой игры при каждом обновлении списка, а движок весит ~300 КБ."""
+    key = source_stamp(path)
+    if key is None:
         return None
     if key not in _SRC_CACHE:
-        _SRC_CACHE[key] = _text(path)
+        try:
+            _SRC_CACHE[key] = read_source(path).replace("\r\n", "\n")
+        except OSError:
+            return None
     return _SRC_CACHE[key]
 
 
@@ -276,7 +277,7 @@ def deploy(i):
     """Разложить меню в game_{i} по манифесту (печатает статус).
 
     Явные проверки до записи дают точное сообщение по каждой причине
-    (нет движка / нет data / нет папки игры), а не одно общее «запусти gen_data».
+    (нет движка / нет data / нет папки игры), а не одно общее «запусти gen».
     """
     if i not in ROOTS:
         report.warn(i, "нет в манифесте (tmkit/games_data.py) — пропуск")
@@ -293,7 +294,7 @@ def deploy(i):
     if generate.OUT == BUILD and generate.is_stale(i):
         generate.gen(i)
     if not os.path.exists(data):
-        report.bad(i, f"нет data (game_{i}) — сначала запусти gen_data.py {i}")
+        report.bad(i, f"нет data (game_{i}) — сначала  python tm.py gen {i}")
         return
     removed = deploy_to(root, data)
     report.info(i, f"deployed -> {root}  (снесено .rpyc: {removed})")

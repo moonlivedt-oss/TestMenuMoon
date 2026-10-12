@@ -13,10 +13,13 @@ ROOT = os.path.dirname(_PKG)
 # Данные манифеста живут внутри пакета (генерируются manifest.save_games).
 GAMES_DATA_PATH = os.path.join(_PKG, "games_data.py")
 
-# Канонический движок — источник правды; deploy копирует ИМЕННО его.
-ENGINE_SRC = os.path.join(ROOT, "zzz_testmenu_engine.rpy")
+# Меню для Ren'Py — источник правды. Исходник разбит на части по разделам
+# (engines/renpy/engine/NN_*.rpy); в игру ставится их склейка одним файлом
+# zzz_testmenu_engine.rpy (см. read_source). ENGINE_SRC может быть и одним файлом (тесты).
+RENPY_DIR = os.path.join(ROOT, "engines", "renpy")
+ENGINE_SRC = os.path.join(RENPY_DIR, "engine")
 # Модуль перевода реплик через AutoTranslator (необязателен: нет файла — не кладём).
-TRANSLATE_SRC = os.path.join(ROOT, "zzz_testmenu_translate.rpy")
+TRANSLATE_SRC = os.path.join(RENPY_DIR, "zzz_testmenu_translate.rpy")
 
 # Твики отдельных игр (поле "tweak" в манифесте): код Ren'Py, который generate дописывает
 # в data-файл игры — ставится и снимается вместе с меню.
@@ -54,3 +57,35 @@ def cand_file(i):
 def game_data_file(i):
     """Собранный data-файл игры N в build/."""
     return os.path.join(BUILD, f"game_{i}", "zzz_testmenu_data.rpy")
+
+
+def source_parts(path):
+    """Файлы источника по порядку: части папки (NN_*.rpy) или сам файл."""
+    if os.path.isdir(path):
+        return [
+            os.path.join(path, n) for n in sorted(os.listdir(path)) if n.endswith(".rpy")
+        ]
+    return [path]
+
+
+def source_stamp(path):
+    """Ключ для кэшей: (имя, mtime, размер) каждой части; None — источника нет."""
+    try:
+        return tuple(
+            (p, os.stat(p).st_mtime_ns, os.stat(p).st_size) for p in source_parts(path)
+        ) or None
+    except OSError:
+        return None
+
+
+def read_source(path):
+    """Текст источника: склейка частей по порядку (концы строк как в файлах).
+    OSError — источника нет."""
+    parts = source_parts(path)
+    if not parts:
+        raise FileNotFoundError(path)
+    out = []
+    for p in parts:
+        with open(p, encoding="utf-8", newline="") as f:
+            out.append(f.read())
+    return "".join(out)

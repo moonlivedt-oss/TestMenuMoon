@@ -1,0 +1,220 @@
+"""Общие импорты и помощники тестов (фейковые игры, сборка сейвов и т.п.).
+
+Каждый файл тестов начинает с `from helpers import *` — так у тестов одна шапка.
+"""
+
+import os, sys, ast, json, tempfile  # noqa: F401  (реэкспорт для тестов)
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
+
+from tmkit import manifest  # noqa: F401  (реэкспорт для тестов)
+from tmkit import generate  # noqa: F401  (реэкспорт для тестов)
+from tmkit import validate  # noqa: F401  (реэкспорт для тестов)
+from tmkit import analysis  # noqa: F401  (реэкспорт для тестов)
+from tmkit import rpa  # noqa: F401  (реэкспорт для тестов)
+from tmkit import games  # noqa: F401  (реэкспорт для тестов)
+from tmkit import engines  # noqa: F401  (реэкспорт для тестов)
+from tmkit import deploy as tmdeploy  # noqa: F401  (реэкспорт для тестов)
+import tm  # noqa: F401  (единая точка входа CLI)
+
+
+def _parse_manifest_text(text):
+    """Выполнить сгенерированный games_data.py и вернуть (GAMES, G, ACCENT)."""
+    ns = {}
+    exec(compile(text, "<manifest>", "exec"), ns)
+    return ns["GAMES"], ns["G"], ns["ACCENT"]
+
+
+def _build_rpa3(files, key=0xDEADBEEF):
+    """Собрать валидный RPA-3.0 из {имя: bytes}. Возвращает bytes архива."""
+    import zlib, pickle
+
+    header_len = len(b"RPA-3.0 %016x %08x\n" % (0, 0))  # фикс. длина (34)
+    data = b""
+    index = {}
+    for name, content in files.items():
+        off = header_len + len(data)
+        index[name] = [(off ^ key, len(content) ^ key)]  # 2-tuple, prefix пуст
+        data += content
+    index_off = header_len + len(data)
+    blob = zlib.compress(pickle.dumps(index))
+    header = b"RPA-3.0 %016x %08x\n" % (index_off, key)
+    assert len(header) == header_len
+    return header + data + blob
+
+
+def _load_twine_inject():
+    import importlib.util
+
+    path = os.path.join(ROOT, "engines", "twine", "inject.py")
+    spec = importlib.util.spec_from_file_location("twine_inject", path)
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+def _write_json(path, obj):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(obj, f)
+
+
+_TWINE_STORY = (
+    "<html><body>\n"
+    '<tw-storydata name="X" startnode="1">\n'
+    '<tw-passagedata pid="1" name="Start">У тебя $gold золота и $rep репутации. Приз: $5!\n'
+    "&lt;&lt;set $gold to 100&gt;&gt;\n"
+    "&lt;&lt;set $intro_done to true&gt;&gt;\n"
+    '&lt;&lt;set $hero_name to "Alex"&gt;&gt;\n'
+    "$gold $gold\n"
+    "</tw-passagedata>\n"
+    "</tw-storydata>\n"
+    "</body></html>\n"
+)
+
+
+def _rpgm_save_dir(tmp, mz):
+    import json as _j
+
+    os.makedirs(os.path.join(tmp, "data"))
+    os.makedirs(os.path.join(tmp, "save"))
+    with open(os.path.join(tmp, "data", "System.json"), "w", encoding="utf-8") as f:
+        _j.dump({"variables": ["", "Репутация"], "switches": ["", "Дверь"]}, f)
+    with open(os.path.join(tmp, "data", "Items.json"), "w", encoding="utf-8") as f:
+        _j.dump([None, {"id": 1, "name": "Зелье"}], f)
+    root = {"party": {"_gold": 250, "_items": {"1": 3}}, "variables": {"_data": [None, 5]},
+            "switches": {"_data": [None, False]}, "actors": {"_data": [None, {"_name": "Харольд", "_hp": 80}]}}
+    return os.path.join(tmp, "save", "file1." + ("rmmzsave" if mz else "rpgsave")), root
+
+
+def _persistent_bytes(fields, changed, signed=False):
+    """persistent Ren'Py из класса, которого в студии нет (renpy.persistent.Persistent)."""
+    import pickle as _p, types as _t, zlib as _z
+
+    mods = {n: _t.ModuleType(n) for n in ("renpy", "renpy.persistent")}
+    exec("class Persistent(object):\n    pass\n", mods["renpy.persistent"].__dict__)
+    sys.modules.update(mods)
+    try:
+        o = mods["renpy.persistent"].Persistent()
+        o.__dict__.update(fields)
+        o._changed = dict(changed)
+        data = _p.dumps(o, protocol=2)
+    finally:
+        for n in mods:
+            del sys.modules[n]
+    out = _z.compress(data, 3)
+    return out + (b"signature AAAA BBBB\n" if signed else b""), mods
+
+
+def _load_persistent(raw, mods):
+    import pickle as _p, zlib as _z
+
+    sys.modules.update(mods)
+    try:
+        return _p.loads(_z.decompressobj().decompress(raw))
+    finally:
+        for n in mods:
+            del sys.modules[n]
+
+
+def _rpa3_from_index(index, payload=b""):
+    import zlib, pickle
+
+    key = 0x42
+    header_len = len(b"RPA-3.0 %016x %08x\n" % (0, key))
+    enc = {
+        n: [(header_len + off ^ key, ln ^ key, b"")] for n, (off, ln) in index.items()
+    }
+    blob = zlib.compress(pickle.dumps(enc, protocol=2))
+    return b"RPA-3.0 %016x %08x\n" % (header_len + len(payload), key) + payload + blob
+
+
+def _engine_text():
+    """Склейка частей движка Ren'Py — ровно то, что ставится в игру."""
+    from tmkit.paths import ENGINE_SRC, read_source
+
+    return read_source(ENGINE_SRC).replace("\r\n", "\n")
+
+
+_MV_PLUGINS = (
+    "// Generated by RPG Maker.\n"
+    "// Do not edit this file directly.\n"
+    "var $plugins =\n"
+    "[\n"
+    '{"name":"Community_Basic","status":true,"description":"Базовые настройки",'
+    '"parameters":{"cacheLimit":"20","screenWidth":"816"}},\n'
+    '{"name":"MadeWithMv","status":false,"description":"Show a Splash Screen \\"Made with MV\\"",'
+    '"parameters":{"Show Made With MV":"true"}}\n'
+    "];\n"
+)
+
+
+def _mk_mv_game(root, www=True):
+    base = os.path.join(root, "www") if www else root
+    os.makedirs(os.path.join(base, "js", "plugins"))
+    with open(os.path.join(base, "index.html"), "w", encoding="utf-8") as f:
+        f.write("<html><body><script src='js/main.js'></script></body></html>")
+    with open(os.path.join(base, "js", "plugins.js"), "w", encoding="utf-8") as f:
+        f.write(_MV_PLUGINS)
+    open(os.path.join(base, "js", "rpg_core.js"), "w").close()
+    return base
+
+
+def _mk_fake_pck(path, files):
+    """Минимальный .pck формата 2 (Godot 4) с текстовыми файлами."""
+    import struct
+
+    entries = [("res://" + n, t.encode()) for n, t in files.items()]
+    head = (
+        struct.pack("<4sIIII", b"GDPC", 2, 4, 2, 2)
+        + struct.pack("<IQ", 0, 0)
+        + b"\0" * 64
+    )
+    dir_size = 4 + sum(4 + len(n.encode()) + 16 + 16 + 4 for n, _ in entries)
+    base = len(head) + dir_size
+    head = head[:20] + struct.pack("<IQ", 0, base) + head[32:]
+    d, data, ofs = struct.pack("<I", len(entries)), b"", 0
+    for n, b in entries:
+        nb = n.encode()
+        d += (
+            struct.pack("<I", len(nb))
+            + nb
+            + struct.pack("<QQ", ofs, len(b))
+            + b"\0" * 16
+            + struct.pack("<I", 0)
+        )
+        data += b
+        ofs += len(b)
+    with open(path, "wb") as f:
+        f.write(head + d + data)
+
+
+# нужны скачанные tools/unity (fetch_unity_tools.py) и csc.exe — без них тест ничего не проверяет
+def _fake_unity_player(path, machine=0x8664):
+    import struct
+
+    pe = bytearray(0x200)
+    pe[0:2] = b"MZ"
+    pe[0x3C:0x40] = struct.pack("<I", 0x80)
+    pe[0x80:0x84] = b"PE\0\0"
+    pe[0x84:0x86] = struct.pack("<H", machine)
+    open(path, "wb").write(bytes(pe))
+
+
+def _pe_machine(path):
+    import struct
+
+    with open(path, "rb") as f:
+        f.seek(0x3C)
+        f.seek(struct.unpack("<I", f.read(4))[0] + 4)
+        return struct.unpack("<H", f.read(2))[0]
+
+
+class _Cp932Info(__import__("zipfile").ZipInfo):
+    """Запись zip с именем в cp932 без флага UTF-8 — как у архиваторов японских игр."""
+
+    def _encodeFilenameFlags(self):
+        return self.filename.encode("cp932"), self.flag_bits & ~0x800
+
+
+__all__ = [n for n in dir() if not n.startswith("__")]

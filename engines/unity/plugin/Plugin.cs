@@ -724,6 +724,9 @@ namespace TestMenu
         bool open;
         float prevScale = 1f;
         float speed = 1f;                                   // темп игры из вкладки «Игра»
+        int stepState;                                      // шаг кадра: 1 — запрошен, 2 — идёт кадр
+        bool showFps;                                       // счётчик FPS в углу экрана
+        float fps;                                          // сглаженный FPS (по реальному времени)
         Dictionary<string, JsonElement> pendingProfile;     // заморозки профиля, ещё не найденные в игре
         float profileNext = 10f, profileUntil = 600f;
         readonly List<(string Name, Vector3 Pos)> places = new();
@@ -900,8 +903,13 @@ namespace TestMenu
             SelfTest();
             GuiTest();
             ProfileTick();
+            float udt = Time.unscaledDeltaTime;
+            if (udt > 0f) fps = fps <= 0f ? 1f / udt : Mathf.Lerp(fps, 1f / udt, 0.1f);
+            // шаг кадра на паузе: один кадр с темпом 1, затем снова пауза
+            if (stepState == 1) { Time.timeScale = 1f; stepState = 2; }
+            else if (stepState == 2) { Time.timeScale = open ? 0f : speed; stepState = 0; }
             // игра сама вернула темп 1 (выход из своей паузы) — снова наш темп
-            if (!open && !Mathf.Approximately(speed, 1f) && Mathf.Approximately(Time.timeScale, 1f)) Time.timeScale = speed;
+            if (stepState == 0 && !open && !Mathf.Approximately(speed, 1f) && Mathf.Approximately(Time.timeScale, 1f)) Time.timeScale = speed;
             if (pendingSkip > 0 && !open)
             {
                 // пропуск времени — после закрытия меню (игра снята с паузы, сюжетные события запускаются как обычно)
@@ -1033,6 +1041,11 @@ namespace TestMenu
                     scrollY += (ev.keyCode == KeyCode.PageDown ? 1 : -1) * viewRect.height * 0.9f;
                     ev.Use();
                 }
+            }
+            if (showFps && ev.type == EventType.Repaint)
+            {
+                Styles();
+                GUI.Box(new Rect(8 * k, 8 * k, 108 * k, 30 * k), "FPS " + Mathf.RoundToInt(fps), sBtnOn);
             }
             if (!open)
             {
@@ -1673,7 +1686,14 @@ namespace TestMenu
             }
             y += 40 * k;
             GUI.Label(new Rect(body.x, y, body.width, 26 * k), "Темп включится после закрытия меню (пока меню открыто, игра на паузе); пока он не ×1, в углу виден значок.", sDim);
-            y += 40 * k;
+            y += 36 * k;
+            if (Btn(new Rect(body.x, y, 220 * k, 32 * k), "Шаг кадра", "Игра на паузе продвигается ровно на один кадр — разглядеть анимацию или баг"))
+            {
+                speed = 0f; prevScale = 0f; stepState = 1;
+            }
+            if (B(new Rect(body.x + 228 * k, y, 220 * k, 32 * k), showFps ? "FPS в углу: вкл" : "FPS в углу: выкл", showFps ? sBtnOn : sBtn)) showFps = !showFps;
+            GUI.Label(new Rect(body.x + 460 * k, y, body.width - 460 * k, 32 * k), "сейчас " + Mathf.RoundToInt(fps) + " кадров/с", sDim);
+            y += 44 * k;
             GUI.Label(new Rect(body.x, y, body.width, 28 * k), "Профиль игры", sAcc);
             y += 34 * k;
             bool hasPr = HasProfile();

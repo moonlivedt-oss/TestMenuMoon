@@ -3,7 +3,6 @@
 
 Сначала мгновенная офлайн-проверка данных (tmkit.validate), затем — что файлы
 меню установлены, и только потом (дорого) запуск `renpy lint` установленной игры.
-Логика вынесена сюда, чтобы root verify.py был тонкой обёрткой.
 """
 import os, subprocess
 
@@ -21,13 +20,13 @@ def verify(i):
     issues = validate.check_game(GAMES[i].get("stats", []), GAMES[i].get("actions", []),
                                  GAMES[i].get("accent"), GAMES[i].get("tweak"))
     if issues:
-        report.warn(i, f"данные: проблем {len(issues)} (подробнее — validate.py)")
+        report.warn(i, f"данные: проблем {len(issues)} (подробнее — tm.py validate)")
         for s in issues:
             report.detail(s)
 
     # data-файл необязателен: после «быстрой установки» в игре только движок (режим «авто»)
     if not os.path.exists(os.path.join(root, ENGINE_FILE)):
-        report.bad(i, f"движок меню не установлен (запусти deploy.py {i})")
+        report.bad(i, f"движок меню не установлен (запусти  python tm.py deploy {i})")
         return
     if not os.path.exists(os.path.join(root, DATA_FILE)):
         report.note(i, "data-файла нет — меню работает в режиме «авто»")

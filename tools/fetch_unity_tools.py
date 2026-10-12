@@ -5,7 +5,7 @@
     Cpp2IL         — имена классов/полей IL2CPP-игры (GameAssembly.dll + global-metadata.dat)
     BepInEx 6 BE   — загрузчик плагинов для Unity IL2CPP (ставится в папку игры)
     UnityExplorer  — плагин BepInEx: окно в игре — объекты, поля, значения на лету
-    BepInEx 5 и UnityExplorer Mono — то же для Mono-игр Unity
+    BepInEx 5 (x64 и x86) и UnityExplorer Mono — то же для Mono-игр Unity
     UE4SS          — загрузчик модов для Unreal Engine 4/5 (кладётся в tools/unity/UE4SS)
 
 Ссылки и версии закреплены ниже; обновить — поменять URL и запустить снова
@@ -50,6 +50,12 @@ TOOLS = [
         "BepInEx5_x64",
         "5.4.23.2",
         "https://github.com/BepInEx/BepInEx/releases/download/v5.4.23.2/BepInEx_win_x64_5.4.23.2.zip",
+    ),
+    # 32-битные Mono-игры (UnityPlayer.dll под x86): свой winhttp.dll (doorstop) той же разрядности
+    (
+        "BepInEx5_x86",
+        "5.4.23.2",
+        "https://github.com/BepInEx/BepInEx/releases/download/v5.4.23.2/BepInEx_win_x86_5.4.23.2.zip",
     ),
     (
         "UnityExplorer_Mono",

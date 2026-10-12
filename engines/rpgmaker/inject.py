@@ -22,18 +22,11 @@ package.nw.tm_bak и распаковывается в папку package.nw —
 
 import os, re, sys, json, shutil, zipfile, argparse
 
-MARK_START = "<!-- TM_RPGM_MENU_START -->"
-MARK_END = "<!-- TM_RPGM_MENU_END -->"
 HERE = os.path.dirname(os.path.abspath(__file__))
 MENU_JS = os.path.join(HERE, "tm_menu.js")  # адаптер движка
-CORE_JS = os.path.normpath(
-    os.path.join(HERE, "..", "_shared", "tm_menu_core.js")
-)  # общий UI
-ICONS_JS = os.path.normpath(
-    os.path.join(HERE, "..", "_shared", "tm_icons.js")
-)  # значки (data-URI), tools/make_icons.py
-sys.path.insert(0, os.path.normpath(os.path.join(HERE, "..", "_shared")))
+sys.path.insert(0, os.path.join(os.path.dirname(HERE), "_shared"))
 import tm_htmlio  # noqa: E402  (кодировка HTML игры: BOM / UTF-8 / meta charset)
+import tm_webinject  # noqa: E402  (запасной способ: <script>-блок в index.html)
 
 PLUGIN_NAME = "TM_Menu"
 PLUGIN_ENTRY = {
@@ -48,17 +41,9 @@ _BASES = ("", "www", PACKAGE, os.path.join(PACKAGE, "www"))
 _PLUGINS_ARRAY = re.compile(r"\$plugins\s*=\s*")
 
 
-def _read(path):
-    """Исходники меню (наши .js) — всегда UTF-8."""
-    # newline="": не трогаем концы строк (иначе LF-файл целиком уезжал в CRLF)
-    with open(path, encoding="utf-8", newline="") as f:
-        return f.read()
-
-
 def _menu_js():
     """Значки + адаптер движка + общее UI-ядро."""
-    icons = _read(ICONS_JS) if os.path.exists(ICONS_JS) else ""
-    return icons + "\n" + _read(MENU_JS) + "\n" + _read(CORE_JS)
+    return tm_webinject.menu_js(MENU_JS)
 
 
 def _plugin_js():
@@ -219,46 +204,15 @@ def _plugin_file(pjs):
 
 
 # ------------------------------------------------------------------ index.html (запасной)
-def block(js):
-    return f"\n{MARK_START}\n<script>\n{js}\n</script>\n{MARK_END}\n"
-
-
-def remove(html):
-    # вместе с обрамляющими \n блока: иначе каждый повторный деплой копил пустую строку
-    pattern = r"\n?" + re.escape(MARK_START) + r".*?" + re.escape(MARK_END) + r"\n?"
-    return re.sub(pattern, "", html, flags=re.S)
-
-
-def inject(html, js):
-    if MARK_START in html:
-        html = remove(html)
-    b = block(js)
-    idx = html.lower().rfind("</body>")
-    return (html + b) if idx == -1 else html[:idx] + b + html[idx:]
-
-
-def _backup(path):
-    """Один раз сохранить нетронутый оригинал рядом (<файл>.tm_bak) — до первой правки."""
-    bak = path + ".tm_bak"
-    if not os.path.exists(bak) and MARK_START not in tm_htmlio.read(path)[0]:
-        shutil.copy2(path, bak)
-
-
-def _html_has_block(path):
-    try:
-        return MARK_START in tm_htmlio.read(target_html(path))[0]
-    except (FileNotFoundError, OSError):
-        return False
+MENU = tm_webinject.HtmlMenu(MENU_JS, "TM_RPGM_MENU", target_html)
+MARK_START, MARK_END = MENU.start, MENU.end
+inject, remove, block = MENU.inject, MENU.remove, MENU.block
+_html_has_block = MENU.has_block
 
 
 def _drop_html_block(path):
     """Убрать <script>-блок из index.html, если он там есть (переход на плагин / снятие)."""
-    if not _html_has_block(path):
-        return False
-    html = target_html(path)
-    text, enc = tm_htmlio.read(html)
-    tm_htmlio.write(html, remove(text), enc)
-    return True
+    return MENU.undeploy(path) is not None
 
 
 # ------------------------------------------------------------------ API
@@ -287,9 +241,7 @@ def deploy_file(path):
             f"не нашёл ни js/plugins.js, ни index.html, ни package.nw в {path} "
             "(ресурсы вшиты в .exe? сначала распакуй, например EnigmaVBUnpacker)"
         ) from None
-    _backup(html)
-    text, enc = tm_htmlio.read(html)
-    tm_htmlio.write(html, inject(text, tm_htmlio.js_for(enc, _menu_js())), enc)
+    MENU.deploy(html)
     return f"{html}: меню внедрено в index.html (Shift+T в игре){note}"
 
 
@@ -328,11 +280,7 @@ def is_current(path):
         except OSError:
             return False
         return same and _plugin_entry_ok(pjs) and not _html_has_block(path)
-    try:
-        text, enc = tm_htmlio.read(target_html(path))
-        return block(tm_htmlio.js_for(enc, _menu_js())) in text
-    except (FileNotFoundError, OSError):
-        return False
+    return MENU.is_current(path)
 
 
 if __name__ == "__main__":

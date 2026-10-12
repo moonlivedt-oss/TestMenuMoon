@@ -1,7 +1,7 @@
 /* ============================================================================
  *  UNIVERSAL TEST MENU — общий UI-ядро (движко-независимое).
  *  Читает window.TM_ADAPTER (задаётся адаптером конкретного движка) и рисует
- *  оверлей: вкладки Значения / Сканер / Экшены, перетаскивание, анимации, тосты.
+ *  оверлей: вкладки Значения / Игра / Сканер / Сейвы / Экшены, перетаскивание, тосты.
  *
  *  Контракт адаптера TM_ADAPTER:
  *    accent   : "#rrggbb"
@@ -15,6 +15,7 @@
  *  Необязательное — вкладка «Игра» (появляется, если есть хоть что-то из этого):
  *    speed    : true — скорость игры через подмену времени (performance.now, Date.now,
  *               requestAnimationFrame); function(k) — своя реализация движка (k = 0 — пауза)
+ *    step()?  : шаг одного кадра на паузе для своей реализации speed (у speed: true — сам)
  *    cheats() : [ { label, desc?, get(), set(bool) } ] — режимы-переключатели
  *    places   : { here(): {name, ...} | null, go(p) } — точки телепорта (хранятся в localStorage)
  *    jumps    : { title, load(cb) } — cb([{ name, hint?, go() }]): список мест для перехода (карты)
@@ -37,8 +38,8 @@
 
   // --- запоминание шага/вкладки/позиции окна между открытиями ---
   var LSKEY = "tm_menu_" + (A.title || "x");
-  function saveState() { try { localStorage.setItem(LSKEY, JSON.stringify({ step: step, tab: tab, pos: winPos })); } catch (e) {} }
-  function loadState() { try { var s = JSON.parse(localStorage.getItem(LSKEY) || "{}"); if ([1, 10, 100].indexOf(s.step) >= 0) step = s.step; if (["vals", "game", "scan", "act"].indexOf(s.tab) >= 0) tab = s.tab; if (s.pos) winPos = s.pos; } catch (e) {} }
+  function saveState() { try { localStorage.setItem(LSKEY, JSON.stringify({ step: step, tab: tab, pos: winPos, fps: showFps })); } catch (e) {} }
+  function loadState() { try { var s = JSON.parse(localStorage.getItem(LSKEY) || "{}"); if ([1, 10, 100].indexOf(s.step) >= 0) step = s.step; if (["vals", "game", "scan", "act", "saves"].indexOf(s.tab) >= 0) tab = s.tab; if (s.pos) winPos = s.pos; if (s.fps) setFps(true); } catch (e) {} }
   function hasGameTab() { return true; }   // там же профиль игры — нужен любому движку
   var jumpList = null, jumpFilter = "";
 
@@ -66,6 +67,39 @@
     if (!b) { b = el("div"); b.id = "tm-speed"; document.body.appendChild(b); }
     b.textContent = k === 0 ? "ПАУЗА" : "×" + k;
   }
+  // шаг кадра на паузе: виртуальное время сдвигается ровно на один кадр (1/60 с);
+  // у движков со своей скоростью (RPG Maker) — их step()
+  function frameStep() {
+    if (speed !== 0) setSpeed(0);
+    try {
+      if (typeof A.speed === "function") { if (A.step) A.step(); else throw new Error("нет step"); }
+      else if (TIME) TIME.vBase += 1000 / 60;
+    } catch (e) { console.error("[TM] шаг кадра", e); toast("Шаг кадра здесь не работает", true); }
+  }
+
+  // счётчик FPS: реальные кадры браузера за последнюю секунду (своим циклом requestAnimationFrame)
+  var showFps = false, fpsVal = 0, fpsN = 0, fpsT = 0, fpsLoop = false;
+  var realNow = performance.now.bind(performance), realRaf = window.requestAnimationFrame;
+  function fpsTick() {
+    if (!showFps) { fpsLoop = false; return; }
+    fpsN++;
+    var t = realNow();
+    if (t - fpsT >= 500) {
+      fpsVal = Math.round(fpsN * 1000 / (t - fpsT)); fpsN = 0; fpsT = t;
+      var b = document.getElementById("tm-fps");
+      if (!b && document.body) { b = el("div"); b.id = "tm-fps"; document.body.appendChild(b); }
+      if (b) b.textContent = "FPS " + fpsVal;
+    }
+    realRaf.call(window, fpsTick);
+  }
+  function setFps(on) {
+    showFps = on;
+    if (!on) { var b = document.getElementById("tm-fps"); if (b) b.remove(); return; }
+    if (!fpsLoop && realRaf) { fpsLoop = true; fpsN = 0; fpsT = realNow(); realRaf.call(window, fpsTick); }
+  }
+
+  try { if (JSON.parse(localStorage.getItem(LSKEY) || "{}").fps) setFps(true); } catch (e) {}
+
   // точки телепорта: localStorage, свои у каждого движка/игры
   var PKEY = LSKEY + "_places_" + (location.pathname || "");
   function loadPlaces() { try { return JSON.parse(localStorage.getItem(PKEY) || "[]"); } catch (e) { return []; } }
@@ -195,6 +229,8 @@
       "color:#07110f;font-weight:800;font-size:13px;padding:9px 20px;border-radius:12px;opacity:0;",
       "transition:opacity .2s;pointer-events:none;box-shadow:0 10px 30px -8px " + ACCENT + "aa}",
       "#tm-toast.err{background:#ff5b5b;color:#160404}",
+      "#tm-fps{position:fixed;left:12px;top:10px;z-index:2147482999;background:#0b0e14e6;color:" + ACCENT + ";font:800 13px 'Consolas',monospace;",
+      "padding:4px 10px;border-radius:9px;border:1px solid " + ACCENT + "55;pointer-events:none}",
       "#tm-speed{position:fixed;right:12px;top:10px;z-index:2147482999;background:" + ACCENT + ";color:#07110f;font:800 13px 'Segoe UI',sans-serif;",
       "padding:4px 10px;border-radius:9px;pointer-events:none;box-shadow:0 6px 18px -6px #000a}",
       "#tm-body::-webkit-scrollbar{width:11px}#tm-body::-webkit-scrollbar-thumb{background:#313a4c;border-radius:6px;border:3px solid transparent;background-clip:padding-box}",
@@ -368,6 +404,11 @@
       });
       list.appendChild(bar);
       list.appendChild(el("div", "tm-msg", "Ускорение — пропускать бои и прогулки, замедление и пауза — разглядеть и успеть. Значок в углу показывает темп, пока он не ×1."));
+      var sb = el("div", "tm-scanbar");
+      mkBtn(sb, "Шаг кадра", function () { frameStep(); rerender(); }).title = "Игра на паузе продвигается ровно на один кадр — разглядеть анимацию или баг";
+      var fb = mkBtn(sb, showFps ? "FPS в углу: вкл" : "FPS в углу: выкл", function () { setFps(!showFps); saveState(); rerender(); });
+      if (showFps) { fb.style.background = ACCENT; fb.style.color = "#07110f"; }
+      list.appendChild(sb);
     }
     var ch = A.cheats ? (A.cheats() || []) : [];
     if (ch.length) {
@@ -443,6 +484,252 @@
     }
   }
 
+  // ------------------------------------------------------------------ вкладка «Сейвы»
+  // Сохранения HTML5-игр почти всегда в localStorage (RPG Maker в браузере, SugarCube,
+  // свои движки) или в IndexedDB (localforage, Construct, GDevelop). Здесь их видно и можно
+  // править: JSON и сжатое LZString разворачиваются в список полей. Перед первой записью
+  // ключа localStorage копия оригинала кладётся рядом (tm_bak:<ключ>) — «Вернуть оригинал».
+  var BAK = "tm_bak:";
+  var saveSel = null, saveDoc = null, saveFilter = "", idbInfo = null;
+
+  function isOurKey(k) { return k.indexOf("tm_menu_") === 0 || k.indexOf(BAK) === 0; }
+  function kb(n) { return n < 1024 ? n + " Б" : n < 1048576 ? (n / 1024).toFixed(1) + " КБ" : (n / 1048576).toFixed(1) + " МБ"; }
+
+  // текст -> {kind, data}: json | lz64 (RPG Maker MV) | lz16 (SugarCube) | text
+  function decodeText(raw) {
+    try { return { kind: "json", data: JSON.parse(raw) }; } catch (e) {}
+    var LZ = window.LZString;
+    if (LZ) {
+      var tries = [["lz64", "decompressFromBase64"], ["lz16", "decompressFromUTF16"]];
+      for (var i = 0; i < tries.length; i++) {
+        try {
+          var t = LZ[tries[i][1]](raw);
+          if (t && /^\s*[\[{]/.test(t)) return { kind: tries[i][0], data: JSON.parse(t) };
+        } catch (e) {}
+      }
+    }
+    return { kind: "text", data: raw };
+  }
+  function encodeText(kind, data) {
+    if (kind === "text") return String(data);
+    var s = JSON.stringify(data);
+    if (kind === "lz64") return window.LZString.compressToBase64(s);
+    if (kind === "lz16") return window.LZString.compressToUTF16(s);
+    return s;
+  }
+  var KIND = { json: "JSON", lz64: "LZString (base64)", lz16: "LZString (UTF-16)", text: "текст", obj: "объект" };
+
+  // скалярные поля дерева: [{path:[…], name, v}]
+  function flatten(obj) {
+    var out = [], seen = [];
+    (function walk(o, path, depth) {
+      if (out.length > 3000) return;
+      var t = typeof o;
+      if (o === null || t === "number" || t === "string" || t === "boolean") {
+        if (path.length) out.push({ path: path, name: path.join("."), v: o });
+        return;
+      }
+      if (t !== "object" || depth > 7 || seen.indexOf(o) >= 0) return;
+      seen.push(o);
+      Object.keys(o).forEach(function (k) { walk(o[k], path.concat([k]), depth + 1); });
+    })(obj, [], 0);
+    return out;
+  }
+  function setPath(obj, path, v) {
+    var o = obj;
+    for (var i = 0; i < path.length - 1; i++) o = o[path[i]];
+    o[path[path.length - 1]] = v;
+  }
+
+  function download(name, text) {
+    var a = el("a");
+    a.href = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+    a.download = name.replace(/[^\w.\- ]+/g, "_") + ".json";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+  }
+
+  // ---- IndexedDB (все вызовы асинхронные: по готовности — перерисовка вкладки)
+  function idbOpen(name, cb, fail) {
+    try {
+      var rq = indexedDB.open(name);
+      rq.onsuccess = function () { cb(rq.result); };
+      rq.onerror = function () { fail(rq.error); };
+      rq.onupgradeneeded = function () { try { rq.transaction.abort(); } catch (e) {} };  // базы нет — не создаём
+    } catch (e) { fail(e); }
+  }
+  function idbScan(done) {
+    var names = indexedDB.databases ? indexedDB.databases().then(function (l) { return l.map(function (d) { return d.name; }); })
+      : Promise.resolve(["localforage"]);
+    names.then(function (list) {
+      var dbs = [], left = list.length;
+      if (!left) return done(dbs);
+      list.forEach(function (name) {
+        idbOpen(name, function (db) {
+          var stores = Array.prototype.slice.call(db.objectStoreNames), info = { name: name, stores: [] }, n = stores.length;
+          dbs.push(info);
+          if (!n) { db.close(); if (!--left) done(dbs); return; }
+          stores.forEach(function (st) {
+            var rq = db.transaction(st, "readonly").objectStore(st).getAllKeys(null, 500);
+            rq.onsuccess = function () { info.stores.push({ name: st, keys: rq.result }); if (!--n) { db.close(); if (!--left) done(dbs); } };
+            rq.onerror = function () { if (!--n) { db.close(); if (!--left) done(dbs); } };
+          });
+        }, function () { if (!--left) done(dbs); });
+      });
+    }, function () { done([]); });
+  }
+  function idbGet(sel, cb, fail) {
+    idbOpen(sel.db, function (db) {
+      var rq = db.transaction(sel.store, "readonly").objectStore(sel.store).get(sel.key);
+      rq.onsuccess = function () { db.close(); cb(rq.result); };
+      rq.onerror = function () { db.close(); fail(rq.error); };
+    }, fail);
+  }
+  function idbPut(sel, value, cb, fail) {
+    idbOpen(sel.db, function (db) {
+      var os = db.transaction(sel.store, "readwrite").objectStore(sel.store);
+      var rq = os.keyPath != null ? os.put(value) : os.put(value, sel.key);
+      rq.onsuccess = function () { db.close(); cb(); };
+      rq.onerror = function () { db.close(); fail(rq.error); };
+    }, fail);
+  }
+
+  // открыть сейв: localStorage — сразу, IndexedDB — асинхронно
+  function openSave(sel) {
+    saveSel = sel; saveDoc = null; saveFilter = "";
+    if (sel.kind === "ls") {
+      var raw = localStorage.getItem(sel.key) || "", d = decodeText(raw);
+      saveDoc = { kind: d.kind, data: d.data, raw: raw, dirty: false };
+      rerender();
+      return;
+    }
+    idbGet(sel, function (v) {
+      var d = typeof v === "string" ? decodeText(v) : { kind: "obj", data: v };
+      saveDoc = { kind: d.kind, data: d.data, raw: v, dirty: false, str: typeof v === "string" };
+      if (tab === "saves") rerender();
+    }, function (e) { toast("Не прочитать запись", true); console.error("[TM]", e); });
+  }
+
+  function writeSave() {
+    var sel = saveSel, doc = saveDoc;
+    if (sel.kind === "ls") {
+      try {
+        if (localStorage.getItem(BAK + sel.key) == null && doc.raw.length < 1500000) localStorage.setItem(BAK + sel.key, doc.raw);
+      } catch (e) {}
+      try { localStorage.setItem(sel.key, encodeText(doc.kind, doc.data)); }
+      catch (e) { toast("Не записать (место в хранилище?)", true); console.error("[TM]", e); return; }
+      doc.raw = localStorage.getItem(sel.key); doc.dirty = false;
+      toast("Записано — загрузи этот сейв в игре"); rerender();
+      return;
+    }
+    var val = doc.str ? encodeText(doc.kind, doc.data) : doc.data;
+    idbPut(sel, val, function () { doc.dirty = false; toast("Записано — загрузи этот сейв в игре"); if (tab === "saves") rerender(); },
+      function (e) { toast("Не записать в IndexedDB", true); console.error("[TM]", e); });
+  }
+
+  function renderSaveDoc(list) {
+    var sel = saveSel, doc = saveDoc;
+    var bar = el("div", "tm-scanbar"), wb = null;
+    mkBtn(bar, "← к списку", function () {
+      if (doc && doc.dirty && !confirm("Правки не записаны. Выйти без записи?")) return;
+      saveSel = saveDoc = null; rerender();
+    });
+    // правка поля не перерисовывает список (иначе прокрутка улетала наверх) — только кнопку
+    function markDirty() { doc.dirty = true; wb.textContent = "Записать правки"; wb.style.background = ACCENT; wb.style.color = "#07110f"; }
+    if (doc) {
+      wb = mkBtn(bar, "Правок нет", function () { if (doc.dirty) writeSave(); });
+      if (doc.dirty) markDirty();
+      mkBtn(bar, "Скачать копию", function () {
+        download((sel.kind === "ls" ? sel.key : sel.db + "_" + sel.key), typeof doc.raw === "string" ? doc.raw : JSON.stringify(doc.raw));
+      }).title = "Файл с текущим содержимым — на всякий случай";
+      if (sel.kind === "ls" && localStorage.getItem(BAK + sel.key) != null) {
+        mkBtn(bar, "Вернуть оригинал", function () {
+          if (!confirm("Вернуть сейв к состоянию до первой правки из меню?")) return;
+          localStorage.setItem(sel.key, localStorage.getItem(BAK + sel.key));
+          localStorage.removeItem(BAK + sel.key);
+          openSave(sel); toast("Оригинал возвращён");
+        });
+      }
+    }
+    list.appendChild(bar);
+    section(list, sel.kind === "ls" ? "localStorage: " + sel.key : "IndexedDB: " + sel.db + " / " + sel.store + " / " + sel.key);
+    if (!doc) { list.appendChild(el("div", "tm-msg", "Читаю…")); return; }
+    list.appendChild(el("div", "tm-msg", "Формат: " + KIND[doc.kind] + ". Правки записываются кнопкой «Записать правки»; игра увидит их, когда загрузит этот сейв."));
+    if (doc.kind === "text") {
+      var tb = el("div", "tm-scanbar");
+      mkBtn(tb, "Изменить текст…", function () {
+        var v = prompt(sel.key + ":", String(doc.data));
+        if (v !== null) { doc.data = v; doc.dirty = true; rerender(); }
+      });
+      list.appendChild(tb);
+      list.appendChild(el("div", "tm-msg", String(doc.data).slice(0, 600) + (String(doc.data).length > 600 ? "…" : "")));
+      return;
+    }
+    var fields = flatten(doc.data);
+    var fbar = el("div", "tm-filter"), inp = el("input", "tm-finput");
+    inp.placeholder = "фильтр по полю… (" + fields.length + ")"; inp.value = saveFilter;
+    inp.addEventListener("input", function () {
+      saveFilter = inp.value.toLowerCase();
+      Array.prototype.forEach.call(list.querySelectorAll(".tm-row"), function (r) {
+        r.style.display = r.querySelector(".k").textContent.toLowerCase().indexOf(saveFilter) >= 0 ? "" : "none";
+      });
+    });
+    fbar.appendChild(inp); list.appendChild(fbar);
+    fields.slice(0, 1500).forEach(function (f) {
+      var shown = typeof f.v === "string" && f.v.length > 60 ? f.v.slice(0, 60) + "…" : String(f.v);
+      var h = row(list, f.name, shown);
+      if (saveFilter && f.name.toLowerCase().indexOf(saveFilter) < 0) h.row.style.display = "none";
+      function put(v) {
+        setPath(doc.data, f.path, v); f.v = v; markDirty();
+        h.setV(typeof v === "string" && v.length > 60 ? v.slice(0, 60) + "…" : String(v));
+      }
+      if (typeof f.v === "boolean") mkIco(h.ctrl, "swap", "вкл/выкл", function () { put(!f.v); }, "Переключить");
+      else mkIco(h.ctrl, "edit", "ввод", function () {
+        var v = prompt(f.name + ":", String(f.v));
+        if (v === null) return;
+        if (typeof f.v === "number") { if (v.trim() === "" || isNaN(Number(v))) { toast("Нужно число", true); return; } put(Number(v)); }
+        else put(v);
+      }, "Ввести значение");
+    });
+    if (fields.length > 1500) list.appendChild(el("div", "tm-msg", "Показаны первые 1500 полей — сузь фильтром."));
+  }
+
+  function renderSaves(list) {
+    if (saveSel) { renderSaveDoc(list); return; }
+    section(list, "localStorage");
+    var keys = [];
+    try { for (var i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i)); } catch (e) {}
+    keys = keys.filter(function (k) { return !isOurKey(k); }).sort();
+    if (!keys.length) list.appendChild(el("div", "tm-msg", "Пусто: игра не хранит сейвы в localStorage (у RPG Maker на ПК они в файлах — их правит редактор сохранений студии)."));
+    keys.forEach(function (k) {
+      var raw = localStorage.getItem(k) || "";
+      var h = row(list, k, kb(raw.length * 2) + (localStorage.getItem(BAK + k) != null ? ", есть копия" : ""));
+      mkBtn(h.ctrl, "открыть", function () { openSave({ kind: "ls", key: k }); });
+    });
+    section(list, "IndexedDB");
+    if (!window.indexedDB) { list.appendChild(el("div", "tm-msg", "IndexedDB недоступна.")); return; }
+    if (!idbInfo) {
+      var b = el("div", "tm-scanbar");
+      mkBtn(b, "Показать базы", function () { toast("Читаю базы…"); idbScan(function (dbs) { idbInfo = dbs; if (tab === "saves") rerender(); }); });
+      list.appendChild(b);
+      return;
+    }
+    if (!idbInfo.length) list.appendChild(el("div", "tm-msg", "Баз нет."));
+    idbInfo.forEach(function (db) {
+      db.stores.forEach(function (st) {
+        list.appendChild(el("div", "tm-msg", db.name + " / " + st.name + ": записей " + st.keys.length));
+        st.keys.slice(0, 200).forEach(function (key) {
+          var h = row(list, "  " + String(key), "");
+          h.row.querySelector(".v").remove();
+          mkBtn(h.ctrl, "открыть", function () { openSave({ kind: "idb", db: db.name, store: st.name, key: key }); });
+        });
+      });
+    });
+    var rb = el("div", "tm-scanbar");
+    mkBtn(rb, "Перечитать базы", function () { idbInfo = null; rerender(); });
+    list.appendChild(rb);
+  }
+
   // Раз в 400 мс: вернуть замороженные значения и обновить показанные. Заморозка
   // работает и при закрытом меню — таймер живёт, пока есть хоть одно замороженное.
   function tick() {
@@ -465,6 +752,7 @@
     if (tab === "vals") renderVals(bodyEl);
     else if (tab === "game") renderGame(bodyEl);
     else if (tab === "scan") renderScan(bodyEl);
+    else if (tab === "saves") renderSaves(bodyEl);
     else renderActions(bodyEl);
   }
 
@@ -527,7 +815,7 @@
     enableDrag(head);
 
     var tabs = el("div"); tabs.id = "tm-tabs";
-    [["vals", "Значения"], ["game", "Игра"], ["scan", "Сканер"], ["act", "Экшены"]].forEach(function (d) {
+    [["vals", "Значения"], ["game", "Игра"], ["scan", "Сканер"], ["saves", "Сейвы"], ["act", "Экшены"]].forEach(function (d) {
       if (d[0] === "game" && !hasGameTab()) return;
       var b = mkBtn(tabs, d[1], function () { tab = d[0]; Array.prototype.forEach.call(tabs.children, function (o) { o.className = ""; }); b.className = "on"; saveState(); rerender(); });
       if (d[0] === tab) b.className = "on";

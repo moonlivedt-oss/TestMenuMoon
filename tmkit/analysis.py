@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Ядро curate_dump: поиск кандидатов статов/инвентаря в распакованных исходниках.
+"""Ядро tm.py curate: поиск кандидатов статов/инвентаря в распакованных исходниках.
 
 Ищет НЕ только плоские `default/define NAME = число`, но и то, что раньше
 приходилось копать вручную:
@@ -196,7 +196,7 @@ def dump(i):
     files = sorted(glob.glob(f"{glob.escape(ana_dir(i))}/**/*.rpy", recursive=True))
     if not files:
         report.warn(
-            i, f"нет исходников в {ana_dir(i)} — сначала collect_sources.py {i}"
+            i, f"нет исходников в {ana_dir(i)} — сначала tm.py collect {i}"
         )
 
     flat = {}  # NAME -> value

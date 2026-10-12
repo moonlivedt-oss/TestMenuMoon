@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Редактор сохранений: Ren'Py, RPG Maker MV/MZ, Unity (PlayerPrefs и JSON), Godot (JSON, ConfigFile).
+"""Редактор сохранений: Ren'Py (сейвы и persistent), RPG Maker MV/MZ, Unity (PlayerPrefs и JSON), Godot.
 
-Открывается из студии (кнопка «Сохранения…») или сам:  python save_editor.py [файл сейва]
+Открывается из студии (кнопка «Сохранения…») или сам:  python tm.py saves [файл сейва]
 Форматы и запись — tmkit/saves.py. Перед первой записью рядом с файлом остаётся <файл>.tm_bak.
 """
 
@@ -26,8 +26,8 @@ from PyQt6.QtWidgets import (
     QMessageBox,
 )
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, HERE)
+# запуск файлом (python tmstudio/save_editor.py) — корень проекта в sys.path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tmkit import saves, engines  # noqa: E402
 
@@ -170,7 +170,7 @@ class SaveEditor(QDialog):
             self,
             "Файл сохранения",
             "",
-            "Сохранения (*.save *.rpgsave *.rmmzsave *.json *.sav *.dat *.cfg *.es3 *.txt);;Все файлы (*)",
+            "Сохранения (*.save *.rpgsave *.rmmzsave *.json *.sav *.dat *.cfg *.es3 *.txt persistent);;Все файлы (*)",
         )
         if p:
             self._set_targets("Файл", [("файл", p)])
@@ -267,18 +267,15 @@ class SaveEditor(QDialog):
         )
 
 
-def main():
+def main(path=None):
     app = QApplication(sys.argv)
-    try:
-        import studio
+    from tmstudio.theme import QSS
 
-        app.setStyleSheet(studio.QSS)
-    except Exception:
-        pass
-    w = SaveEditor(path=sys.argv[1] if len(sys.argv) > 1 else None)
+    app.setStyleSheet(QSS)
+    w = SaveEditor(path=path)
     w.show()
-    sys.exit(app.exec())
+    return app.exec()
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main(sys.argv[1] if len(sys.argv) > 1 else None))

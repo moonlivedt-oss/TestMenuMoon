@@ -49,6 +49,8 @@ var scan_msg = "Нажми «Снимок», поиграй и возвраща�
 var story_filter = ""
 var speed = 1.0            # темп игры (Engine.time_scale) из вкладки «Игра»
 var speed_label: Label     # значок темпа в углу, пока он не ×1
+var show_fps = false       # счётчик FPS в углу экрана
+var fps_label: Label
 var places = []            # точки телепорта игрока: {"name", "scene", "pos"}
 
 var _usage = null           # смысл переменных по сценам Dialogic (кэш)
@@ -1045,6 +1047,34 @@ func _set_speed(k: float) -> void:
 	speed_label.visible = k != 1.0
 
 
+# шаг кадра на паузе: один кадр с темпом 1 (и без паузы дерева, если меню открыто), затем
+# снова пауза. process_frame приходит до _process узлов — поэтому ждём начала второго кадра.
+func _frame_step() -> void:
+	_set_speed(0.0)
+	var was_paused = get_tree().paused
+	get_tree().paused = false
+	Engine.time_scale = 1.0
+	await get_tree().process_frame
+	await get_tree().process_frame
+	Engine.time_scale = speed
+	get_tree().paused = was_paused
+
+
+func _set_fps(on: bool) -> void:
+	show_fps = on
+	if fps_label == null:
+		fps_label = _label("", 16, ACCENT)
+		var sb = _box(Color("#0b0e14e6"), 9)
+		sb.content_margin_left = 10
+		sb.content_margin_right = 10
+		fps_label.add_theme_stylebox_override("normal", sb)
+		fps_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		fps_label.offset_left = 12
+		fps_label.offset_top = 10
+		add_child(fps_label)
+	fps_label.visible = on
+
+
 func _tab_game() -> void:
 	_heading("Игра", "stopwatch")
 	_section("Скорость игры")
@@ -1058,6 +1088,14 @@ func _tab_game() -> void:
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hint.custom_minimum_size = Vector2(760, 0)
 	body.add_child(hint)
+	var rs = _row()
+	rs.add_child(_button("Шаг кадра", func(): _frame_step(); refresh(), "",
+			"Игра на паузе продвигается ровно на один кадр — разглядеть анимацию или баг"))
+	var fb = _button("FPS в углу: вкл" if show_fps else "FPS в углу: выкл", func(): _set_fps(not show_fps); refresh())
+	if show_fps:
+		fb.add_theme_color_override("font_color", ACCENT)
+	rs.add_child(fb)
+	rs.add_child(_label("сейчас %d кадров/с" % Engine.get_frames_per_second(), 14, DIM))
 	_section("Профиль игры")
 	var has_pr = FileAccess.file_exists(_profile_path())
 	var rp = _row()
@@ -1195,6 +1233,8 @@ func _input(event: InputEvent) -> void:
 
 
 func _process(_delta: float) -> void:
+	if show_fps and fps_label != null:
+		fps_label.text = "FPS %d" % Engine.get_frames_per_second()
 	for p in frozen:
 		if get_value(p) != frozen[p]:
 			set_value(p, frozen[p])

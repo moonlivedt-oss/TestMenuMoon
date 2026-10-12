@@ -7,9 +7,10 @@
     python tm.py uninstall ALL     # снести меню из всех игр манифеста
     python tm.py list              # игры манифеста: движок + статус установки
     python tm.py quick "D:/Games/X"  # меню в любую игру по пути, без манифеста
+    python tm.py library "D:/Games"  # все игры в папке: движок + статус (--install)
+    python tm.py saves             # редактор сохранений (нужен PyQt6)
 Без номеров команда работает по всем играм манифеста (curate — по реально
-распакованным в D:/_ta). Отдельные обёртки (deploy.py, gen_data.py, …) остаются:
-их по имени файла запускает студия (studio.py) — интерфейс `python deploy.py 3` цел.
+распакованным в D:/_ta). Студия (studio.py) запускает эти же команды отдельным процессом.
 """
 
 import argparse, sys
@@ -138,6 +139,46 @@ def cmd_quick(args):
             print(f"[X] {path}: {e}")
             failed += 1
     return 1 if failed else 0
+
+
+def cmd_library(args):
+    """Все игры в папке: движок и состояние меню; --install / --update / --remove — пачкой."""
+    from tmkit import library
+
+    found = library.find_games(args.folder, depth=args.depth)
+    if not found:
+        print(f"игр не найдено: {args.folder}")
+        return 1
+    failed = 0
+    for g in found:
+        act = None
+        if args.remove and g.status in ("ok", "stale"):
+            act = library.remove
+        elif args.install and g.status != "ok":
+            act = library.install
+        elif args.update and g.status == "stale":
+            act = library.install
+        if act is not None:
+            try:
+                print(f"     {act(g)}")
+                library.refresh(g)
+            except Exception as e:  # одна игра не обрывает остальные
+                print(f"[X] {g.name}: {e}")
+                failed += 1
+        mark = {"ok": report.OK, "stale": report.NOTE, "none": "[ ]"}.get(g.status, report.WARN)
+        num = f"game_{g.index}" if g.index is not None else ""
+        print(f"{mark:4} {g.engine.key:8} {_STATUS.get(g.status, '?'):12} {num:8} {g.name}  ({g.folder})")
+    return 1 if failed else 0
+
+
+def cmd_saves(args):
+    """Редактор сохранений (окно PyQt6): файл сейва или выбор игры в окне."""
+    try:
+        from tmstudio import save_editor
+    except ImportError as e:
+        print(f"[X] редактору сохранений нужен PyQt6 ({e}):  pip install -r requirements.txt")
+        return 1
+    return save_editor.main(args.file)
 
 
 # студия «Весь пайплайн» гоняет ровно этот порядок (collect -> curate -> gen -> deploy)
@@ -308,6 +349,27 @@ def build_parser():
     sp.add_argument("paths", nargs="+", metavar="PATH", help="путь к игре")
     sp.add_argument("--remove", action="store_true", help="снять меню вместо установки")
     sp.set_defaults(func=cmd_quick)
+
+    sp = sub.add_parser(
+        "library",
+        help="все игры в папке: движок и статус меню (поставить/обновить/снять пачкой)",
+        description="найти игры в папке (на --depth уровней вниз), показать движок и статус меню",
+    )
+    sp.add_argument("folder", metavar="ПАПКА", help="папка с играми, например D:/Games")
+    sp.add_argument("--depth", type=int, default=2, help="на сколько уровней заходить (2)")
+    g = sp.add_mutually_exclusive_group()
+    g.add_argument("--install", action="store_true", help="поставить меню, где его нет или оно старое")
+    g.add_argument("--update", action="store_true", help="обновить только устаревшие")
+    g.add_argument("--remove", action="store_true", help="снять меню отовсюду")
+    sp.set_defaults(func=cmd_library)
+
+    sp = sub.add_parser(
+        "saves",
+        help="редактор сохранений (окно; нужен PyQt6)",
+        description="редактор сохранений: Ren'Py, RPG Maker, Unity, Godot, persistent Ren'Py",
+    )
+    sp.add_argument("file", nargs="?", help="файл сейва (без него — выбрать игру в окне)")
+    sp.set_defaults(func=cmd_saves)
 
     sp = sub.add_parser(
         "list",

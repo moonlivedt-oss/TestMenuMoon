@@ -1,7 +1,7 @@
 # Зависимости тулкита TestMenuMoon.
 #
-# Только для GUI-студии (studio.py). Скрипты пайплайна (collect_sources / curate_dump /
-# gen_data / deploy / verify / uninstall) и тесты (test_smoke.py) — на чистой стандартной
+# Только для GUI-студии (studio.py) и редактора сохранений. CLI (tm.py: collect / curate /
+# gen / deploy / verify / uninstall) и тесты (tests/run.py) — на чистой стандартной
 # библиотеке, без внешних пакетов. Декомпилятор unrpyc вендорится в ./unrpyc.
 #
 #   pip install -r requirements.txt

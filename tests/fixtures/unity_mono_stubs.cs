@@ -26,11 +26,13 @@ namespace UnityEngine
         public static GameObject Find(string n) { return null; }
     }
     public static class Resources { public static Object[] FindObjectsOfTypeAll(Type t) { return new Object[0]; } }
-    public static class Time { public static float timeScale; public static float realtimeSinceStartup; }
+    public static class Time { public static float timeScale; public static float realtimeSinceStartup; public static float unscaledDeltaTime; }
     public static class Mathf
     {
         public static float Min(float a, float b) { return a < b ? a : b; }
         public static bool Approximately(float a, float b) { return Math.Abs(a - b) < 1e-6; }
+        public static float Lerp(float a, float b, float t) { return a + (b - a) * t; }
+        public static int RoundToInt(float f) { return (int)Math.Round(f); }
     }
     public enum CursorLockMode { None, Locked, Confined }
     public static class Cursor { public static CursorLockMode lockState; public static bool visible; }
@@ -85,6 +87,7 @@ namespace UnityEngine
         public static void Label(string t, GUIStyle s, params GUILayoutOption[] o) { }
         public static void Label(GUIContent c, params GUILayoutOption[] o) { }
         public static bool Button(string t, params GUILayoutOption[] o) { return false; }
+        public static bool Button(GUIContent c, params GUILayoutOption[] o) { return false; }
         public static bool Button(string t, GUIStyle s, params GUILayoutOption[] o) { return false; }
         public static bool Toggle(bool v, string t, GUIStyle s, params GUILayoutOption[] o) { return v; }
         public static string TextField(string t, params GUILayoutOption[] o) { return t; }

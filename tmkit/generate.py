@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Ядро gen_data: рендер per-game zzz_testmenu_data.rpy из манифеста.
+"""Ядро tm.py gen: рендер per-game zzz_testmenu_data.rpy из манифеста.
 
 Данные (заголовок, акцент, статы, действия) живут в манифесте — здесь только рендер.
 Пишет в build/game_{i}/zzz_testmenu_data.rpy.

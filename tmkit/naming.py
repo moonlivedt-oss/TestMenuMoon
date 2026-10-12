@@ -1,7 +1,7 @@
 """Понятные имена переменных для студии — те же правила, что у движка в игре.
 
 Словарь перевода (TM_WORDS) и служебные слова (TM_GENERIC) берутся прямо из
-zzz_testmenu_engine.rpy: источник один, движок и студия не расходятся.
+engines/renpy/engine/04_naming.rpy: источник один, движок и студия не расходятся.
 Персонажи — из `define x = Character("Имя")` в исходниках игры; свои имена,
 заданные в игре щелчком по имени, — из game/tm_names.json.
 
@@ -14,7 +14,7 @@ import json
 import os
 import re
 
-from tmkit.paths import ENGINE_SRC
+from tmkit.paths import ENGINE_SRC, read_source, source_stamp
 
 _CHAR_RE = re.compile(
     r'^\s*define\s+(\w+)\s*=\s*(?:\w+\.)*\w*Character\(\s*(?:_\(\s*)?[urbURB]?(["\'])([^"\'\[{]+)\2'
@@ -31,10 +31,12 @@ def _literal(text, start, end):
 
 
 def vocabulary(engine_src=ENGINE_SRC):
-    """(слова {en: ru}, служебные frozenset) из движка; кэш по mtime файла."""
-    key = (engine_src, os.path.getmtime(engine_src))
+    """(слова {en: ru}, служебные frozenset) из движка; кэш по mtime частей."""
+    key = source_stamp(engine_src)
+    if key is None:
+        raise FileNotFoundError(engine_src)
     if _cache.get("vocab_key") != key:
-        text = open(engine_src, encoding="utf-8").read()
+        text = read_source(engine_src).replace("\r\n", "\n")
         words = _literal(text, "TM_WORDS = {", "\n    }")
         generic = _literal(text, "TM_GENERIC = frozenset((", ")")
         _cache["inflect"] = _literal(text, "TM_INFLECT = (", ")")
@@ -43,6 +45,23 @@ def vocabulary(engine_src=ENGINE_SRC):
         _cache["vocab_key"] = key
         _cache["vocab"] = (words, frozenset(generic))
     return _cache["vocab"]
+
+
+def words_json():
+    """Словарь имён для меню Godot и Unity (tm_words.json) — тот же, что у движка Ren'Py."""
+    words, generic = vocabulary()
+    return json.dumps(
+        {
+            "words": words,
+            "generic": sorted(generic),
+            "inflect": list(_cache["inflect"]),
+            "stems": sorted(_cache["stems"]),
+            "stat_words": list(_cache["stat_words"]),
+        },
+        ensure_ascii=False,
+        indent=0,
+        sort_keys=True,
+    )
 
 
 def tokens(text):

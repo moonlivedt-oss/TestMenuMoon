@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Статический скан Twine/SugarCube-истории — аналог curate_dump для Ren'Py.
+"""Статический скан Twine/SugarCube-истории — аналог tm.py curate для Ren'Py.
 
 У Twine нет байткода: переменные истории — это `$name` в исходниках пассажей, а в
 рантайме они лежат в `State.variables.name`. Скомпилированный `.html` держит пассажи

@@ -14,8 +14,10 @@ import sys
 from collections import defaultdict
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, HERE)
-import pck as pckmod  # noqa: E402
+sys.path.insert(0, os.path.join(os.path.dirname(HERE), "_shared"))
+import tm_load  # noqa: E402
+
+pckmod = tm_load.load("godot", "pck.py")
 
 CMP = re.compile(r"\{([\w.]+)\}\s*(>=|<=|==|!=|>|<)\s*(-?\d+(?:\.\d+)?)")
 BARE = re.compile(r"(?:if|elif|\[if)\s+!?\{([\w.]+)\}")

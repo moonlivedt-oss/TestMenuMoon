@@ -316,6 +316,9 @@ namespace TestMenuMono
     {
         static bool open;
         static float prevScale = 1f, speed = 1f;
+        static int stepState;      // шаг кадра: 1 — запрошен, 2 — идёт кадр
+        static bool showFps;       // счётчик FPS в углу экрана
+        static float fps;          // сглаженный FPS (по реальному времени)
         static CursorLockMode prevLock;
         static bool prevVisible;
         static string tab = "main", filter = "", tip = "";
@@ -336,7 +339,12 @@ namespace TestMenuMono
         internal static void Update()
         {
             ProfileTick();
-            if (!open && speed != 1f && Mathf.Approximately(Time.timeScale, 1f)) Time.timeScale = speed;
+            float udt = Time.unscaledDeltaTime;
+            if (udt > 0f) fps = fps <= 0f ? 1f / udt : Mathf.Lerp(fps, 1f / udt, 0.1f);
+            // шаг кадра на паузе: один кадр с темпом 1, затем снова пауза
+            if (stepState == 1) { Time.timeScale = 1f; stepState = 2; }
+            else if (stepState == 2) { Time.timeScale = open ? 0f : speed; stepState = 0; }
+            if (stepState == 0 && !open && speed != 1f && Mathf.Approximately(Time.timeScale, 1f)) Time.timeScale = speed;
             if (frozen.Count == 0) return;
             foreach (Entry e in entries)
             {
@@ -423,6 +431,7 @@ namespace TestMenuMono
             { Toggle(!open); ev.Use(); return; }
             if (open && ev.type == EventType.KeyDown && ev.keyCode == KeyCode.Escape) { Toggle(false); ev.Use(); return; }
             Styles();
+            if (showFps) GUI.Label(new Rect(10, 8, 140, 26), "FPS " + Mathf.RoundToInt(fps), sHead);
             if (!open)
             {
                 if (speed != 1f) GUI.Label(new Rect(Screen.width - 120, 8, 110, 26), speed == 0f ? "ПАУЗА" : "×" + speed.ToString("0.##"), sHead);
@@ -592,6 +601,12 @@ namespace TestMenuMono
                 { speed = k; prevScale = k; }
             GUILayout.EndHorizontal();
             GUILayout.Label("Темп включится после закрытия меню (пока меню открыто, игра на паузе); пока он не ×1, в углу виден значок.", sDim);
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button(new GUIContent("Шаг кадра", "Игра на паузе продвигается ровно на один кадр"), GUILayout.Width(200)))
+            { speed = 0f; prevScale = 0f; stepState = 1; }
+            showFps = GUILayout.Toggle(showFps, showFps ? "FPS в углу: вкл" : "FPS в углу: выкл", GUI.skin.button, GUILayout.Width(200));
+            GUILayout.Label("сейчас " + Mathf.RoundToInt(fps) + " кадров/с", sDim);
+            GUILayout.EndHorizontal();
             GUILayout.Space(10);
             GUILayout.Label("Профиль игры", sAcc);
             GUILayout.BeginHorizontal();

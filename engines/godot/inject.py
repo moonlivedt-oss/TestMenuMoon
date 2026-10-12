@@ -16,7 +16,6 @@ TestMenu с абсолютным путём к tm_godot/tm_menu.gd (относи
 """
 
 import argparse
-import json
 import os
 import re
 import shutil
@@ -24,9 +23,11 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.normpath(os.path.join(HERE, "..", ".."))
-sys.path.insert(0, HERE)
-sys.path.insert(0, ROOT)
-import pck as pckmod  # noqa: E402
+sys.path.insert(0, os.path.join(os.path.dirname(HERE), "_shared"))
+import tm_load  # noqa: E402
+
+tm_load.use_tmkit()
+pckmod = tm_load.load("godot", "pck.py")
 
 MENU_SRC = os.path.join(HERE, "tm_menu.gd")
 ICONS_SRC = os.path.join(ROOT, "assets", "tm_ui", "ic")
@@ -60,19 +61,7 @@ def godot_version(path):
 def _words_json():
     from tmkit import naming
 
-    words, generic = naming.vocabulary()
-    return json.dumps(
-        {
-            "words": words,
-            "generic": sorted(generic),
-            "inflect": list(naming._cache["inflect"]),
-            "stems": sorted(naming._cache["stems"]),
-            "stat_words": list(naming._cache["stat_words"]),
-        },
-        ensure_ascii=False,
-        indent=0,
-        sort_keys=True,
-    )
+    return naming.words_json()
 
 
 def _menu_path(d):

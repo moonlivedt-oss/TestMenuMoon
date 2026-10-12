@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Статический скан данных RPG Maker MV/MZ — аналог curate_dump для Ren'Py.
+"""Статический скан данных RPG Maker MV/MZ — аналог tm.py curate для Ren'Py.
 
 Эвристики не нужны: RPG Maker хранит человекочитаемые имена прямо в data/*.json:
   * System.json  -> variables[] и switches[] (имя по индексу),

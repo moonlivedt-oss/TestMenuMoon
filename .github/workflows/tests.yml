@@ -25,4 +25,4 @@ jobs:
         env:
           PYTHONIOENCODING: utf-8
           PYTHONUTF8: "1"
-        run: python tests/test_smoke.py
+        run: python tests/run.py

@@ -251,6 +251,13 @@ window.TM_ADAPTER = {
     }
   },
 
+  // шаг кадра на паузе: MZ — одно обновление в determineRepeatNumber, MV — накопитель на кадр
+  step: function () {
+    if (!tmHas("SceneManager")) throw new Error("нет SceneManager");
+    if (SceneManager.determineRepeatNumber) TMR.acc += 1;
+    else SceneManager._accumulator = SceneManager._deltaTime;
+  },
+
   cheats: function () {
     if (!tmHas("Game_Player")) return [];
     return [
