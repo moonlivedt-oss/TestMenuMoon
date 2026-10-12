@@ -41,8 +41,8 @@ function tmwWatch(owner, key, name, cb) {
   var d;
   try { d = Object.getOwnPropertyDescriptor(owner, key); } catch (e) {}
   if (!d || !("value" in d) || !d.configurable) {
-    cb(["Это значение не отследить: свойство нельзя перенастроить (var на странице, " +
-        "замороженный объект или геттер движка). Попробуй поле объекта уровнем ниже."]);
+    cb([T("Это значение не отследить: свойство нельзя перенастроить (var на странице, ") +
+        T("замороженный объект или геттер движка). Попробуй поле объекта уровнем ниже.")]);
     return;
   }
   var value = d.value, hits = {}, total = 0, prog = "", seen = 0;
@@ -63,12 +63,12 @@ function tmwWatch(owner, key, name, cb) {
   });
   setTimeout(function () {
     try { Object.defineProperty(owner, key, { configurable: true, enumerable: d.enumerable, writable: true, value: value }); } catch (e) {}
-    var lines = ["Слежка " + TMW_WATCH_MS / 1000 + " с: изменений " + total + ", мест в коде " + seen + "."];
+    var lines = [T("Слежка ") + TMW_WATCH_MS / 1000 + T(" с: изменений ") + total + T(", мест в коде ") + seen + "."];
     Object.keys(hits).sort(function (a, b) { return hits[b].n - hits[a].n; }).slice(0, 12).forEach(function (st) {
       var h = hits[st];
-      lines.push("×" + h.n + "  (" + h.from + " → " + h.to + ")  " + (st || "без стека (изменилось из встроенного кода)"));
+      lines.push("×" + h.n + "  (" + h.from + " → " + h.to + ")  " + (st || T("без стека (изменилось из встроенного кода)")));
     });
-    if (!total) lines.push("Игра не меняла значение. Сделай в игре то, что должно его менять, и запусти снова.");
+    if (!total) lines.push(T("Игра не меняла значение. Сделай в игре то, что должно его менять, и запусти снова."));
     cb(lines);
   }, TMW_WATCH_MS);
 }
@@ -133,7 +133,7 @@ function tmwConstruct2(secs) {
     var t = tmwType(v.data);
     if (t) rows.push(tmwRow(v, "data", v.name, t));
   });
-  if (rows.length) secs.push({ title: "Construct 2: глобальные переменные", rows: rows, top: true });
+  if (rows.length) secs.push({ title: T("Construct 2: глобальные переменные"), rows: rows, top: true });
 }
 
 // --- Construct 3: IRuntime — из скрипта проекта (globalThis.runtime, частый приём
@@ -161,7 +161,7 @@ function tmwConstruct3(secs) {
     try { t = tmwType(gv[k]); } catch (e) { return; }
     if (t) rows.push({ name: k, type: t, get: function () { return gv[k]; }, set: function (x) { gv[k] = x; } });
   });
-  if (rows.length) secs.push({ title: "Construct 3: глобальные переменные", rows: rows, top: true });
+  if (rows.length) secs.push({ title: T("Construct 3: глобальные переменные"), rows: rows, top: true });
   var objs = ir.objects, inst = [];
   if (objs) Object.keys(objs).slice(0, 60).forEach(function (type) {
     var list;
@@ -177,7 +177,7 @@ function tmwConstruct3(secs) {
       });
     });
   });
-  if (inst.length) secs.push({ title: "Construct 3: переменные экземпляров", rows: inst, top: true });
+  if (inst.length) secs.push({ title: T("Construct 3: переменные экземпляров"), rows: inst, top: true });
 }
 
 // --- GDevelop: сцену ловим на ходу (renderAndStep зовётся каждый кадр)
@@ -208,8 +208,8 @@ function tmwGdevelop(secs) {
   tmwGdHook();
   var sc = TMW.gd;
   if (!sc) return;
-  try { tmwGdVars(sc.getGame().getVariables(), "GDevelop: переменные игры", secs); } catch (e) {}
-  try { tmwGdVars(sc.getVariables(), "GDevelop: переменные сцены", secs); } catch (e) {}
+  try { tmwGdVars(sc.getGame().getVariables(), T("GDevelop: переменные игры"), secs); } catch (e) {}
+  try { tmwGdVars(sc.getVariables(), T("GDevelop: переменные сцены"), secs); } catch (e) {}
 }
 
 // --- Phaser 3: registry игры и data сцен (сам объект игры не обходим — там движок)
@@ -227,12 +227,12 @@ function tmwPhaser(game, gname, secs) {
   (game.scene.scenes || []).forEach(function (s) {
     if (!s.sys || !s.sys.isActive || !s.sys.isActive()) return;
     var key = (s.sys.settings && s.sys.settings.key) || "scene";
-    if (s.data) dm(s.data.list, "Phaser: сцена " + key + " (data)");
+    if (s.data) dm(s.data.list, T("Phaser: сцена ") + key + " (data)");
     var own = [];
     tmwWalk(s, "", 1, own, [s.sys, s.game, s.add, s.make, s.cameras, s.input, s.load, s.physics, s.tweens, s.time,
       s.anims, s.sound, s.textures, s.events, s.registry, s.data, s.children, s.lights, s.scale, s.plugins, s.renderer]);
     own = own.filter(function (r) { return r.name.indexOf("sys.") !== 0; });
-    if (own.length) secs.push({ title: "Phaser: сцена " + key + " (поля)", rows: own, top: true });
+    if (own.length) secs.push({ title: T("Phaser: сцена ") + key + T(" (поля)"), rows: own, top: true });
   });
 }
 
@@ -255,9 +255,9 @@ function tmwScan() {
     if (tmwIsPhaserGame(v)) { tmwPhaser(v, k, secs); return; }
     if (v && typeof v === "object" && !tmwSkipObj(v)) objs.push(k);
   });
-  if (globals.length) secs.push({ title: "Глобальные переменные", rows: globals, top: true });
+  if (globals.length) secs.push({ title: T("Глобальные переменные"), rows: globals, top: true });
   if (TMW.c3worker && !secs.some(function (s) { return /Construct 3/.test(s.title); }))
-    secs.unshift({ title: "Construct 3: рантайм в воркере — переменные игры недоступны (видно только страницу)", rows: [] });
+    secs.unshift({ title: T("Construct 3: рантайм в воркере — переменные игры недоступны (видно только страницу)"), rows: [] });
   var groups = [];
   objs.forEach(function (k) {
     var rows = [];
@@ -271,13 +271,14 @@ function tmwScan() {
 
 window.TM_ADAPTER = {
   accent: "#7cc4ff",
-  title: "HTML5-игра",
+  id: "HTML5-игра",  // ключ localStorage (профиль, точки) — не зависит от языка меню
+  title: T("HTML5-игра"),
   ready: function () { return !!document.body; },
 
   stats: function () { return tmwScan(); },
 
-  whereHint: "Слежу 15 с: закрой меню и сделай в игре то, что меняет значение",
-  whereTip: "Кто в коде игры меняет это значение: 15 секунд слежки за записью, потом список мест",
+  whereHint: T("Слежу 15 с: закрой меню и сделай в игре то, что меняет значение"),
+  whereTip: T("Кто в коде игры меняет это значение: 15 секунд слежки за записью, потом список мест"),
 
   nums: function () {
     var o = {};
@@ -291,13 +292,13 @@ window.TM_ADAPTER = {
 
   actions: function () {
     return [
-      { label: "Пересканировать", desc: "заново найти объекты игры (после загрузки уровня)", run: function () { TMW.base = null; } },
-      { label: "Найденное → в консоль", desc: "F12 → Console: группы и пути", run: function () {
+      { label: T("Пересканировать"), desc: T("заново найти объекты игры (после загрузки уровня)"), run: function () { TMW.base = null; } },
+      { label: T("Найденное → в консоль"), desc: T("F12 → Console: группы и пути"), run: function () {
         tmwScan().forEach(function (s) { console.log("[TM]", s.title, s.rows.map(function (r) { return r.name; })); });
       } },
-      { label: "Своя команда (JS)…", desc: "выполняется в странице игры", run: function () { var c = prompt("JS:", "score = 1000"); if (c) (0, eval)(c); } }
+      { label: T("Своя команда (JS)…"), desc: T("выполняется в странице игры"), run: function () { var c = prompt("JS:", "score = 1000"); if (c) (0, eval)(c); } }
     ];
   },
 
-  footMissing: "Страница ещё не загрузилась — открой меню, когда игра появится."
+  footMissing: T("Страница ещё не загрузилась — открой меню, когда игра появится.")
 };

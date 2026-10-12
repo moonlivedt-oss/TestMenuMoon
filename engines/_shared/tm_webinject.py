@@ -18,6 +18,7 @@ import tm_htmlio
 SHARED = os.path.dirname(os.path.abspath(__file__))
 CORE_JS = os.path.join(SHARED, "tm_menu_core.js")  # общий UI
 ICONS_JS = os.path.join(SHARED, "tm_icons.js")  # значки (data-URI), tools/make_icons.py
+LANG_JS = os.path.join(SHARED, "tm_lang.js")  # словарь EN и T() для текста меню
 
 
 def read_js(path):
@@ -27,9 +28,9 @@ def read_js(path):
 
 
 def menu_js(adapter_js):
-    """Значки + адаптер движка + общее ядро (именно в таком порядке)."""
+    """Значки + язык + адаптер движка + общее ядро (именно в таком порядке: адаптер уже зовёт T)."""
     icons = read_js(ICONS_JS) if os.path.exists(ICONS_JS) else ""
-    return icons + "\n" + read_js(adapter_js) + "\n" + read_js(CORE_JS)
+    return icons + "\n" + read_js(LANG_JS) + "\n" + read_js(adapter_js) + "\n" + read_js(CORE_JS)
 
 
 class HtmlMenu:

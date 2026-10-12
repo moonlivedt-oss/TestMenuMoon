@@ -242,7 +242,7 @@ def test_web_engine_detects_folder_and_injects_index():
 
 def test_web_menus_have_game_tab_contract():
     core = open(os.path.join(ROOT, "engines", "_shared", "tm_menu_core.js"), encoding="utf-8").read()
-    assert '["game", "Игра"]' in core and "function renderGame" in core and "requestAnimationFrame" in core
+    assert '["game", T("Игра")]' in core and "function renderGame" in core and "requestAnimationFrame" in core
     rpgm = open(os.path.join(ROOT, "engines", "rpgmaker", "tm_menu.js"), encoding="utf-8").read()
     for key in ("speed: function", "cheats: function", "places:", "isDebugThrough", "canEncounter", "Отряд: "):
         assert key in rpgm, key
@@ -693,7 +693,7 @@ def test_web_unpacks_packed_nwjs_game():
 
 def test_web_journal_where_and_construct3_present():
     core = open(os.path.join(ROOT, "engines", "_shared", "tm_menu_core.js"), encoding="utf-8").read()
-    for key in ("function journalTick", 'jMark(fkey, "меню")', 'jMark(k, "заморозка")', "function whereDone"):
+    for key in ("function journalTick", 'jMark(fkey, T("меню"))', 'jMark(k, T("заморозка"))', "function whereDone"):
         assert key in core, key
     web = open(os.path.join(ROOT, "engines", "web", "tm_menu.js"), encoding="utf-8").read()
     for key in ("function tmwWatch", "where: function", "function tmwConstruct3", "c3_runtimeInterface", "globalVars"):
@@ -797,3 +797,25 @@ def test_gamemaker_detect_script_and_guards():
     # GML в C#-строке @"…": кавычки удвоены, иначе скрипт UTMT не скомпилируется
     assert 'keyboard_check_pressed(ord(""T""))' in csx and 'ord("T")' not in csx
     assert "IsVersionAtLeast(2, 3)" in csx and "EventSubtypeDraw.DrawGUI" in csx
+
+
+def _tm_en():
+    text = open(os.path.join(ROOT, "engines", "_shared", "tm_lang.js"), encoding="utf-8").read()
+    start = text.index("var TM_EN = ") + len("var TM_EN = ")
+    return json.loads(text[start:text.index("\n};", start) + 2])
+
+
+def test_web_menu_strings_have_english():
+    """Каждая строка T("…") веб-меню есть в словаре tm_lang.js — иначе в EN останется русской."""
+    import re
+
+    en = _tm_en()
+    missing = []
+    for path in (("_shared", "tm_menu_core.js"), ("web", "tm_menu.js"), ("rpgmaker", "tm_menu.js"), ("twine", "tm_menu.js")):
+        text = open(os.path.join(ROOT, "engines", *path), encoding="utf-8").read()
+        for m in re.finditer(r'T\("((?:[^"\\]|\\.)*)"\)', text):
+            key = json.loads('"' + m.group(1) + '"')
+            if key not in en:
+                missing.append((path[0], key))
+    assert not missing, missing[:20]
+    assert not [k for k, v in en.items() if not v], "пустые переводы"

@@ -5,7 +5,7 @@
  *
  *  Контракт адаптера TM_ADAPTER:
  *    accent   : "#rrggbb"
- *    title    : "Название движка"
+ *    title    : "Название движка"   (id — ключ для localStorage, если title переводится)
  *    ready()  : bool — доступны ли данные игры
  *    stats()  : [ { title, rows:[ { name, type:'num'|'bool'|'str', get(), set(v) } ] } ]
  *    nums()   : { имя: число }              — числа для сканера
@@ -25,21 +25,23 @@
  * ==========================================================================*/
 (function () {
   if (window.__TM_MENU__) return;
+  // язык: tm_lang.js (TM_EN, T); без него — русский как есть
+  if (typeof T !== "function") { window.T = function (s) { return s; }; window.TM_LANG = "ru"; window.tmSetLang = function () {}; }
   var A = window.TM_ADAPTER;
-  if (!A) { console.warn("[TM] нет TM_ADAPTER — ядро меню не запущено"); return; }
+  if (!A) { console.warn(T("[TM] нет TM_ADAPTER — ядро меню не запущено")); return; }
   window.__TM_MENU__ = true;
 
   var ACCENT = A.accent || "#38e0c8";
   var step = 1, tab = "vals";
   var overlay = null, winEl = null, bodyEl = null;
-  var scanSnap = {}, scanCands = null, scanMsg = "Нажми «Снимок», измени что-то в игре, затем сужай.";
+  var scanSnap = {}, scanCands = null, scanMsg = T("Нажми «Снимок», измени что-то в игре, затем сужай.");
   var filter = "", winPos = null;
   // «живые» значения: пока меню открыто, показанные числа догоняют игру (таймеры,
   // события) без переоткрытия; frozen — заморозка: имя строки -> удерживаемое значение
   var live = [], liveTimer = null, frozen = {};
 
   // --- запоминание шага/вкладки/позиции окна между открытиями ---
-  var LSKEY = "tm_menu_" + (A.title || "x");
+  var LSKEY = "tm_menu_" + (A.id || A.title || "x");
   function saveState() { try { localStorage.setItem(LSKEY, JSON.stringify({ step: step, tab: tab, pos: winPos, fps: showFps })); } catch (e) {} }
   function loadState() { try { var s = JSON.parse(localStorage.getItem(LSKEY) || "{}"); if ([1, 10, 100].indexOf(s.step) >= 0) step = s.step; if (["vals", "game", "scan", "act", "saves"].indexOf(s.tab) >= 0) tab = s.tab; if (s.pos) winPos = s.pos; if (s.fps) setFps(true); } catch (e) {} }
   function hasGameTab() { return true; }   // там же профиль игры — нужен любому движку
@@ -63,20 +65,20 @@
   }
   function setSpeed(k) {
     try { if (typeof A.speed === "function") A.speed(k); else timeSpeed(k); speed = k; }
-    catch (e) { console.error("[TM] скорость", e); toast("Скорость не меняется", true); return; }
+    catch (e) { console.error(T("[TM] скорость"), e); toast(T("Скорость не меняется"), true); return; }
     var b = document.getElementById("tm-speed");
     if (k === 1) { if (b) b.remove(); return; }
     if (!b) { b = el("div"); b.id = "tm-speed"; document.body.appendChild(b); }
-    b.textContent = k === 0 ? "ПАУЗА" : "×" + k;
+    b.textContent = k === 0 ? T("ПАУЗА") : "×" + k;
   }
   // шаг кадра на паузе: виртуальное время сдвигается ровно на один кадр (1/60 с);
   // у движков со своей скоростью (RPG Maker) — их step()
   function frameStep() {
     if (speed !== 0) setSpeed(0);
     try {
-      if (typeof A.speed === "function") { if (A.step) A.step(); else throw new Error("нет step"); }
+      if (typeof A.speed === "function") { if (A.step) A.step(); else throw new Error(T("нет step")); }
       else if (TIME) TIME.vBase += 1000 / 60;
-    } catch (e) { console.error("[TM] шаг кадра", e); toast("Шаг кадра здесь не работает", true); }
+    } catch (e) { console.error(T("[TM] шаг кадра"), e); toast(T("Шаг кадра здесь не работает"), true); }
   }
 
   // счётчик FPS: реальные кадры браузера за последнюю секунду (своим циклом requestAnimationFrame)
@@ -153,7 +155,7 @@
       try { ok = A.ready() && document.body; } catch (e) {}
       if (!ok && ++tries < 120) return;
       clearInterval(t);
-      if (ok) { var n = applyProfile(p); notice("TEST MENU: профиль игры применён" + (n ? " (заморозок: " + n + ")" : "")); }
+      if (ok) { var n = applyProfile(p); notice(T("TEST MENU: профиль игры применён") + (n ? T(" (заморозок: ") + n + ")" : "")); }
     }, 500);
   })();
 
@@ -171,7 +173,7 @@
       var t = typeof v;
       if (!(t === "number" || t === "string" || t === "boolean")) return;
       if (k in jPrev && jPrev[k] !== v) {
-        changelog.push({ t: now, key: k, from: jPrev[k], to: v, who: jSrc[k] || "игра" });
+        changelog.push({ t: now, key: k, from: jPrev[k], to: v, who: jSrc[k] || T("игра") });
       }
       jPrev[k] = v;
     });
@@ -187,13 +189,13 @@
   }
   function showJournal() {
     var lines = journalLines();
-    showInfo("Журнал изменений (" + changelog.length + ")",
-      lines.length ? lines.slice(0, 200) : ["Пока ничего не менялось. Журнал сверяет «Значения» раз в секунду."],
-      [["Скачать", function () {
+    showInfo(T("Журнал изменений (") + changelog.length + ")",
+      lines.length ? lines.slice(0, 200) : [T("Пока ничего не менялось. Журнал сверяет «Значения» раз в секунду.")],
+      [[T("Скачать"), function () {
         var a = el("a");
         a.href = URL.createObjectURL(new Blob([journalLines().reverse().join("\n")], { type: "text/plain" }));
         a.download = "tm_journal.txt"; document.body.appendChild(a); a.click(); a.remove();
-      }], ["Очистить", function () { changelog = []; showJournal(); }]]);
+      }], [T("Очистить"), function () { changelog = []; showJournal(); }]]);
   }
 
   // --- пульт в студии (tmkit/bridge.py): раз в 0.7 с отдаём значения, забираем команды.
@@ -227,14 +229,14 @@
         if (!r) return;
         if (c.op === "set") {
           var v = r.type === "num" ? Number(c.v) : r.type === "bool" ? (c.v === true || c.v === "true" || c.v === 1) : String(c.v);
-          jMark(c.k, "пульт"); r.set(v);
+          jMark(c.k, T("пульт")); r.set(v);
           if (frozen[c.k]) frozen[c.k].v = r.get();
         } else if (c.op === "freeze") {
           frozen[c.k] = { v: r.get(), set: r.set, get: r.get }; startTick();
         } else if (c.op === "unfreeze") {
           delete frozen[c.k];
         }
-      } catch (e) { console.error("[TM] пульт", e); }
+      } catch (e) { console.error(T("[TM] пульт"), e); }
     });
     if (overlay && cmds && cmds.length) live.forEach(function (f) { try { f(); } catch (e) {} });
   }
@@ -355,7 +357,7 @@
     return b;
   }
   function fmt(v, type) {
-    if (type === "bool") return v ? "ВКЛ" : "выкл";
+    if (type === "bool") return v ? T("ВКЛ") : T("выкл");
     // дробные (координаты, таймеры) — не длиннее 3 знаков после точки
     if (typeof v === "number" && v % 1 !== 0) return String(Math.round(v * 1000) / 1000);
     return String(v);
@@ -394,15 +396,15 @@
 
   function renderVals(list) {
     var secs = A.stats() || [];
-    if (!secs.length) { list.appendChild(el("div", "tm-msg", A.footMissing || "Данные недоступны.")); return; }
+    if (!secs.length) { list.appendChild(el("div", "tm-msg", A.footMissing || T("Данные недоступны."))); return; }
 
     var fbar = el("div", "tm-filter");
     var inp = el("input", "tm-finput");
-    inp.type = "text"; inp.placeholder = "фильтр по имени…"; inp.value = filter;
+    inp.type = "text"; inp.placeholder = T("фильтр по имени…"); inp.value = filter;
     inp.addEventListener("input", function () { filter = inp.value.toLowerCase(); applyFilter(list); });
     fbar.appendChild(inp);
-    var jb = mkBtn(fbar, "журнал: " + changelog.length, showJournal);
-    jb.className = "tm-jbtn"; jb.title = "Что, когда и кем изменено: игрой, меню или заморозкой";
+    var jb = mkBtn(fbar, T("журнал: ") + changelog.length, showJournal);
+    jb.className = "tm-jbtn"; jb.title = T("Что, когда и кем изменено: игрой, меню или заморозкой");
     list.appendChild(fbar);
 
     secs.forEach(function (sec) {
@@ -412,26 +414,26 @@
         var fkey = (sec.title || "") + "/" + r.name;
         function rf() { h.setV(fmt(r.get(), r.type)); }
         // правка замороженного значения = новое удерживаемое значение
-        function put(v) { jMark(fkey, "меню"); r.set(v); if (frozen[fkey]) frozen[fkey].v = r.get(); rf(); }
+        function put(v) { jMark(fkey, T("меню")); r.set(v); if (frozen[fkey]) frozen[fkey].v = r.get(); rf(); }
         live.push(rf);
-        if (r.where) mkBtn(h.ctrl, "где", function () {
-          toast(A.whereHint || "Ищу в событиях игры…");
+        if (r.where) mkBtn(h.ctrl, T("где"), function () {
+          toast(A.whereHint || T("Ищу в событиях игры…"));
           r.where(function (lines) { whereDone(r.name, lines); });
-        }).title = A.whereTip || "Где игра меняет и проверяет это значение";
+        }).title = A.whereTip || T("Где игра меняет и проверяет это значение");
         if (r.type === "num") {
           mkBtn(h.ctrl, "−", function () { put(r.get() - step); });
           mkBtn(h.ctrl, "+", function () { put(r.get() + step); });
-          mkIco(h.ctrl, "edit", "ввод", function () { var v = prompt(r.name + ":", String(r.get())); if (v !== null && v.trim() !== "" && !isNaN(Number(v))) put(Number(v)); }, "Ввести значение");
-          var fb = mkIco(h.ctrl, "snow", "стоп", function () {
+          mkIco(h.ctrl, "edit", T("ввод"), function () { var v = prompt(r.name + ":", String(r.get())); if (v !== null && v.trim() !== "" && !isNaN(Number(v))) put(Number(v)); }, T("Ввести значение"));
+          var fb = mkIco(h.ctrl, "snow", T("стоп"), function () {
             if (frozen[fkey]) delete frozen[fkey]; else frozen[fkey] = { v: r.get(), set: r.set, get: r.get };
             fb.className = frozen[fkey] ? "on" : "";
           });
-          fb.title = "Заморозить: игра не сможет изменить значение";
+          fb.title = T("Заморозить: игра не сможет изменить значение");
           if (frozen[fkey]) { frozen[fkey].set = r.set; frozen[fkey].get = r.get; fb.className = "on"; }
         } else if (r.type === "bool") {
-          mkIco(h.ctrl, "swap", "вкл/выкл", function () { jMark(fkey, "меню"); r.set(!r.get()); rf(); }, "Переключить");
+          mkIco(h.ctrl, "swap", T("вкл/выкл"), function () { jMark(fkey, T("меню")); r.set(!r.get()); rf(); }, T("Переключить"));
         } else {
-          mkIco(h.ctrl, "edit", "ввод", function () { var v = prompt(r.name + ":", String(r.get())); if (v !== null) { jMark(fkey, "меню"); r.set(v); rf(); } }, "Ввести значение");
+          mkIco(h.ctrl, "edit", T("ввод"), function () { var v = prompt(r.name + ":", String(r.get())); if (v !== null) { jMark(fkey, T("меню")); r.set(v); rf(); } }, T("Ввести значение"));
         }
       });
     });
@@ -443,7 +445,7 @@
   function whereDone(title, lines) {
     if (bodyEl) { showInfo(title, lines); return; }
     pendingInfo = [title, lines];
-    notice("TEST MENU: «" + title + "» — готово, открой меню (Shift+T)");
+    notice("TEST MENU: «" + title + T("» — готово, открой меню (Shift+T)"));
   }
 
   // окно-справка поверх вкладки: «← назад» возвращает список
@@ -452,7 +454,7 @@
     live = [];
     bodyEl.innerHTML = "";
     var bar = el("div", "tm-scanbar");
-    mkBtn(bar, "← назад", rerender);
+    mkBtn(bar, T("← назад"), rerender);
     (extra || []).forEach(function (b) { mkBtn(bar, b[0], b[1]); });
     bodyEl.appendChild(bar);
     section(bodyEl, title);
@@ -460,7 +462,7 @@
   }
 
   function scanNarrow(mode) {
-    if (!scanCands) { scanMsg = "Сначала «Снимок»."; return; }
+    if (!scanCands) { scanMsg = T("Сначала «Снимок»."); return; }
     var cur = A.nums(), keep = [];
     scanCands.forEach(function (k) {
       var a = scanSnap[k], b = cur[k];
@@ -468,16 +470,16 @@
       var ok = mode === "changed" ? b !== a : mode === "same" ? b === a : mode === "up" ? b > a : mode === "down" ? b < a : false;
       if (ok) keep.push(k);
     });
-    scanCands = keep; scanSnap = cur; scanMsg = "Осталось кандидатов: <b>" + keep.length + "</b>";
+    scanCands = keep; scanSnap = cur; scanMsg = T("Осталось кандидатов: <b>") + keep.length + "</b>";
   }
   function renderScan(list) {
     var bar = el("div", "tm-scanbar");
-    mkIco(bar, "camera", "", function () { scanSnap = A.nums(); scanCands = Object.keys(scanSnap); scanMsg = "Снимок: <b>" + scanCands.length + "</b> числовых. Измени в игре и сужай."; rerender(); }, "Запомнить текущие числа", "Снимок");
-    mkBtn(bar, "изменились", function () { scanNarrow("changed"); rerender(); });
-    mkBtn(bar, "не изменились", function () { scanNarrow("same"); rerender(); });
-    mkBtn(bar, "больше ▲", function () { scanNarrow("up"); rerender(); });
-    mkBtn(bar, "меньше ▼", function () { scanNarrow("down"); rerender(); });
-    mkBtn(bar, "сброс", function () { scanSnap = {}; scanCands = null; scanMsg = "Сброшено."; rerender(); });
+    mkIco(bar, "camera", "", function () { scanSnap = A.nums(); scanCands = Object.keys(scanSnap); scanMsg = T("Снимок: <b>") + scanCands.length + T("</b> числовых. Измени в игре и сужай."); rerender(); }, T("Запомнить текущие числа"), T("Снимок"));
+    mkBtn(bar, T("изменились"), function () { scanNarrow("changed"); rerender(); });
+    mkBtn(bar, T("не изменились"), function () { scanNarrow("same"); rerender(); });
+    mkBtn(bar, T("больше ▲"), function () { scanNarrow("up"); rerender(); });
+    mkBtn(bar, T("меньше ▼"), function () { scanNarrow("down"); rerender(); });
+    mkBtn(bar, T("сброс"), function () { scanSnap = {}; scanCands = null; scanMsg = T("Сброшено."); rerender(); });
     list.appendChild(bar);
     var m = el("div", "tm-msg"); m.innerHTML = scanMsg; list.appendChild(m);
     if (scanCands && scanCands.length && scanCands.length <= 60) {
@@ -490,7 +492,7 @@
         if (c > o) vv.className = "v tm-up"; else if (c < o) vv.className = "v tm-down";
       });
     } else if (scanCands && scanCands.length > 60) {
-      list.appendChild(el("div", "tm-msg", "Слишком много (" + scanCands.length + ") — сужай кнопками выше."));
+      list.appendChild(el("div", "tm-msg", T("Слишком много (") + scanCands.length + T(") — сужай кнопками выше.")));
     }
   }
 
@@ -500,8 +502,8 @@
       card.appendChild(el("div", "l", a.label));
       if (a.desc) card.appendChild(el("div", "d", a.desc));
       card.addEventListener("click", function () {
-        try { a.run(); toast("Готово"); if (tab !== "act") rerender(); }
-        catch (e) { toast("Ошибка", true); console.error("[TM]", e); }
+        try { a.run(); toast(T("Готово")); if (tab !== "act") rerender(); }
+        catch (e) { toast(T("Ошибка"), true); console.error("[TM]", e); }
       });
       list.appendChild(card);
     });
@@ -509,43 +511,43 @@
 
   function renderGame(list) {
     if (A.speed) {
-      section(list, "Скорость игры");
+      section(list, T("Скорость игры"));
       var bar = el("div", "tm-scanbar");
-      [[0, "пауза"], [0.25, "×0.25"], [0.5, "×0.5"], [1, "×1"], [2, "×2"], [3, "×3"], [5, "×5"]].forEach(function (d) {
+      [[0, T("пауза")], [0.25, "×0.25"], [0.5, "×0.5"], [1, "×1"], [2, "×2"], [3, "×3"], [5, "×5"]].forEach(function (d) {
         var b = mkBtn(bar, d[1], function () { setSpeed(d[0]); rerender(); });
         if (d[0] === speed) { b.style.background = ACCENT; b.style.color = "#07110f"; }
       });
       list.appendChild(bar);
-      list.appendChild(el("div", "tm-msg", "Ускорение — пропускать бои и прогулки, замедление и пауза — разглядеть и успеть. Значок в углу показывает темп, пока он не ×1."));
+      list.appendChild(el("div", "tm-msg", T("Ускорение — пропускать бои и прогулки, замедление и пауза — разглядеть и успеть. Значок в углу показывает темп, пока он не ×1.")));
       var sb = el("div", "tm-scanbar");
-      mkBtn(sb, "Шаг кадра", function () { frameStep(); rerender(); }).title = "Игра на паузе продвигается ровно на один кадр — разглядеть анимацию или баг";
-      var fb = mkBtn(sb, showFps ? "FPS в углу: вкл" : "FPS в углу: выкл", function () { setFps(!showFps); saveState(); rerender(); });
+      mkBtn(sb, T("Шаг кадра"), function () { frameStep(); rerender(); }).title = T("Игра на паузе продвигается ровно на один кадр — разглядеть анимацию или баг");
+      var fb = mkBtn(sb, showFps ? T("FPS в углу: вкл") : T("FPS в углу: выкл"), function () { setFps(!showFps); saveState(); rerender(); });
       if (showFps) { fb.style.background = ACCENT; fb.style.color = "#07110f"; }
       list.appendChild(sb);
     }
     var ch = A.cheats ? (A.cheats() || []) : [];
     if (ch.length) {
-      section(list, "Режимы");
+      section(list, T("Режимы"));
       ch.forEach(function (c) {
         var h = row(list, c.label, fmt(c.get(), "bool"));
         if (c.desc) h.row.title = c.desc;
         function rf() { h.setV(fmt(c.get(), "bool")); }
         live.push(rf);
-        mkIco(h.ctrl, "swap", "вкл/выкл", function () { try { c.set(!c.get()); } catch (e) { toast("Ошибка", true); console.error("[TM]", e); } rf(); }, c.desc || "Переключить");
+        mkIco(h.ctrl, "swap", T("вкл/выкл"), function () { try { c.set(!c.get()); } catch (e) { toast(T("Ошибка"), true); console.error("[TM]", e); } rf(); }, c.desc || T("Переключить"));
       });
     }
     if (A.jumps) {
-      section(list, A.jumps.title || "Переходы");
+      section(list, A.jumps.title || T("Переходы"));
       if (!jumpList) {
         var jb = el("div", "tm-scanbar");
-        mkBtn(jb, "Показать список", function () {
-          toast("Загружаю…");
+        mkBtn(jb, T("Показать список"), function () {
+          toast(T("Загружаю…"));
           A.jumps.load(function (rows) { jumpList = rows; if (tab === "game") rerender(); });
         });
         list.appendChild(jb);
       } else {
         var jf = el("input", "tm-finput");
-        jf.placeholder = "фильтр…"; jf.value = jumpFilter;
+        jf.placeholder = T("фильтр…"); jf.value = jumpFilter;
         jf.addEventListener("input", function () {
           jumpFilter = jf.value.toLowerCase();
           Array.prototype.forEach.call(list.querySelectorAll(".tm-jump"), function (r) {
@@ -558,49 +560,56 @@
           h.row.classList.add("tm-jump");
           h.row.querySelector(".v").remove();
           if (j.hint) h.row.title = j.hint;
-          mkBtn(h.ctrl, "перейти", function () { try { j.go(); close(); } catch (e) { toast("Не вышло", true); console.error("[TM]", e); } });
+          mkBtn(h.ctrl, T("перейти"), function () { try { j.go(); close(); } catch (e) { toast(T("Не вышло"), true); console.error("[TM]", e); } });
           if (jumpFilter && j.name.toLowerCase().indexOf(jumpFilter) < 0) h.row.style.display = "none";
         });
       }
     }
-    section(list, "Пульт в студии");
+    section(list, T("Пульт в студии"));
     var bb = el("div", "tm-scanbar");
-    var bbtn = mkBtn(bb, BR.on ? "Пульт: вкл" : "Пульт: выкл", function () { setBridge(!BR.on); rerender(); });
+    var bbtn = mkBtn(bb, BR.on ? T("Пульт: вкл") : T("Пульт: выкл"), function () { setBridge(!BR.on); rerender(); });
     if (BR.on) { bbtn.style.background = ACCENT; bbtn.style.color = "#07110f"; }
-    bbtn.title = "Значения, заморозки, темп и шаг кадра — из окна «Пульт» студии (второй монитор)";
+    bbtn.title = T("Значения, заморозки, темп и шаг кадра — из окна «Пульт» студии (второй монитор)");
     list.appendChild(bb);
-    list.appendChild(el("div", "tm-msg", BR.on ? (BR.ok ? "Связь со студией есть." : "Жду студию: открой в ней «Пульт».")
-      : "Включи, чтобы управлять игрой из студии, не открывая меню поверх игры."));
-    section(list, "Профиль игры");
+    list.appendChild(el("div", "tm-msg", BR.on ? (BR.ok ? T("Связь со студией есть.") : T("Жду студию: открой в ней «Пульт»."))
+      : T("Включи, чтобы управлять игрой из студии, не открывая меню поверх игры.")));
+    section(list, T("Язык меню"));
+    var lb = el("div", "tm-scanbar");
+    [["ru", "Русский"], ["en", "English"]].forEach(function (d) {
+      var b = mkBtn(lb, d[1], function () { tmSetLang(d[0]); close(); open(); tab = "game"; rerender(); });
+      if (TM_LANG === d[0]) { b.style.background = ACCENT; b.style.color = "#07110f"; }
+    });
+    list.appendChild(lb);
+    section(list, T("Профиль игры"));
     var pr = loadProfile(), prb = el("div", "tm-scanbar");
-    mkBtn(prb, "Сохранить профиль", function () {
-      try { localStorage.setItem(FKEY, JSON.stringify(profileNow())); toast("Профиль сохранён"); } catch (e) { toast("Не сохранить", true); }
+    mkBtn(prb, T("Сохранить профиль"), function () {
+      try { localStorage.setItem(FKEY, JSON.stringify(profileNow())); toast(T("Профиль сохранён")); } catch (e) { toast(T("Не сохранить"), true); }
       rerender();
-    }).title = "Темп, включённые режимы и заморозки будут ставиться сами при каждом запуске игры";
-    if (pr) mkBtn(prb, "Удалить профиль", function () { try { localStorage.removeItem(FKEY); } catch (e) {} rerender(); });
+    }).title = T("Темп, включённые режимы и заморозки будут ставиться сами при каждом запуске игры");
+    if (pr) mkBtn(prb, T("Удалить профиль"), function () { try { localStorage.removeItem(FKEY); } catch (e) {} rerender(); });
     list.appendChild(prb);
     list.appendChild(el("div", "tm-msg", pr
-      ? "Сейчас в профиле: темп ×" + pr.speed + ", режимов " + Object.keys(pr.cheats || {}).length + ", заморозок " + Object.keys(pr.frozen || {}).length + ". Ставится сам при запуске игры."
-      : "Профиля нет. Включи нужное (темп, режимы, заморозки во «Значениях») и нажми «Сохранить профиль»."));
+      ? T("Сейчас в профиле: темп ×") + pr.speed + T(", режимов ") + Object.keys(pr.cheats || {}).length + T(", заморозок ") + Object.keys(pr.frozen || {}).length + T(". Ставится сам при запуске игры.")
+      : T("Профиля нет. Включи нужное (темп, режимы, заморозки во «Значениях») и нажми «Сохранить профиль».")));
     if (A.places) {
-      section(list, "Точки телепорта");
+      section(list, T("Точки телепорта"));
       var pb = el("div", "tm-scanbar");
-      mkBtn(pb, "Запомнить место", function () {
+      mkBtn(pb, T("Запомнить место"), function () {
         var p = null;
         try { p = A.places.here(); } catch (e) { console.error("[TM]", e); }
-        if (!p) { toast("Место сейчас не определить", true); return; }
+        if (!p) { toast(T("Место сейчас не определить"), true); return; }
         var a = loadPlaces(); a.push(p); savePlaces(a); rerender();
       });
       list.appendChild(pb);
       var pl = loadPlaces();
-      if (!pl.length) list.appendChild(el("div", "tm-msg", "Пусто. Встань в нужное место и нажми «Запомнить место» — потом сюда можно вернуться одной кнопкой."));
+      if (!pl.length) list.appendChild(el("div", "tm-msg", T("Пусто. Встань в нужное место и нажми «Запомнить место» — потом сюда можно вернуться одной кнопкой.")));
       pl.forEach(function (p, i) {
-        var h = row(list, p.name || ("точка " + (i + 1)), "");
+        var h = row(list, p.name || (T("точка ") + (i + 1)), "");
         h.row.querySelector(".v").remove();
-        mkBtn(h.ctrl, "сюда", function () {
-          try { A.places.go(p); close(); } catch (e) { toast("Не вышло", true); console.error("[TM]", e); }
+        mkBtn(h.ctrl, T("сюда"), function () {
+          try { A.places.go(p); close(); } catch (e) { toast(T("Не вышло"), true); console.error("[TM]", e); }
         });
-        mkBtn(h.ctrl, "×", function () { var a = loadPlaces(); a.splice(i, 1); savePlaces(a); rerender(); }).title = "Удалить точку";
+        mkBtn(h.ctrl, "×", function () { var a = loadPlaces(); a.splice(i, 1); savePlaces(a); rerender(); }).title = T("Удалить точку");
       });
     }
   }
@@ -614,7 +623,7 @@
   var saveSel = null, saveDoc = null, saveFilter = "", idbInfo = null;
 
   function isOurKey(k) { return k.indexOf("tm_menu_") === 0 || k.indexOf(BAK) === 0; }
-  function kb(n) { return n < 1024 ? n + " Б" : n < 1048576 ? (n / 1024).toFixed(1) + " КБ" : (n / 1048576).toFixed(1) + " МБ"; }
+  function kb(n) { return n < 1024 ? n + T(" Б") : n < 1048576 ? (n / 1024).toFixed(1) + T(" КБ") : (n / 1048576).toFixed(1) + T(" МБ"); }
 
   // текст -> {kind, data}: json | lz64 (RPG Maker MV) | lz16 (SugarCube) | text
   function decodeText(raw) {
@@ -638,7 +647,7 @@
     if (kind === "lz16") return window.LZString.compressToUTF16(s);
     return s;
   }
-  var KIND = { json: "JSON", lz64: "LZString (base64)", lz16: "LZString (UTF-16)", text: "текст", obj: "объект" };
+  var KIND = { json: "JSON", lz64: "LZString (base64)", lz16: "LZString (UTF-16)", text: T("текст"), obj: T("объект") };
 
   // скалярные поля дерева: [{path:[…], name, v}]
   function flatten(obj) {
@@ -728,7 +737,7 @@
       var d = typeof v === "string" ? decodeText(v) : { kind: "obj", data: v };
       saveDoc = { kind: d.kind, data: d.data, raw: v, dirty: false, str: typeof v === "string" };
       if (tab === "saves") rerender();
-    }, function (e) { toast("Не прочитать запись", true); console.error("[TM]", e); });
+    }, function (e) { toast(T("Не прочитать запись"), true); console.error("[TM]", e); });
   }
 
   function writeSave() {
@@ -738,47 +747,47 @@
         if (localStorage.getItem(BAK + sel.key) == null && doc.raw.length < 1500000) localStorage.setItem(BAK + sel.key, doc.raw);
       } catch (e) {}
       try { localStorage.setItem(sel.key, encodeText(doc.kind, doc.data)); }
-      catch (e) { toast("Не записать (место в хранилище?)", true); console.error("[TM]", e); return; }
+      catch (e) { toast(T("Не записать (место в хранилище?)"), true); console.error("[TM]", e); return; }
       doc.raw = localStorage.getItem(sel.key); doc.dirty = false;
-      toast("Записано — загрузи этот сейв в игре"); rerender();
+      toast(T("Записано — загрузи этот сейв в игре")); rerender();
       return;
     }
     var val = doc.str ? encodeText(doc.kind, doc.data) : doc.data;
-    idbPut(sel, val, function () { doc.dirty = false; toast("Записано — загрузи этот сейв в игре"); if (tab === "saves") rerender(); },
-      function (e) { toast("Не записать в IndexedDB", true); console.error("[TM]", e); });
+    idbPut(sel, val, function () { doc.dirty = false; toast(T("Записано — загрузи этот сейв в игре")); if (tab === "saves") rerender(); },
+      function (e) { toast(T("Не записать в IndexedDB"), true); console.error("[TM]", e); });
   }
 
   function renderSaveDoc(list) {
     var sel = saveSel, doc = saveDoc;
     var bar = el("div", "tm-scanbar"), wb = null;
-    mkBtn(bar, "← к списку", function () {
-      if (doc && doc.dirty && !confirm("Правки не записаны. Выйти без записи?")) return;
+    mkBtn(bar, T("← к списку"), function () {
+      if (doc && doc.dirty && !confirm(T("Правки не записаны. Выйти без записи?"))) return;
       saveSel = saveDoc = null; rerender();
     });
     // правка поля не перерисовывает список (иначе прокрутка улетала наверх) — только кнопку
-    function markDirty() { doc.dirty = true; wb.textContent = "Записать правки"; wb.style.background = ACCENT; wb.style.color = "#07110f"; }
+    function markDirty() { doc.dirty = true; wb.textContent = T("Записать правки"); wb.style.background = ACCENT; wb.style.color = "#07110f"; }
     if (doc) {
-      wb = mkBtn(bar, "Правок нет", function () { if (doc.dirty) writeSave(); });
+      wb = mkBtn(bar, T("Правок нет"), function () { if (doc.dirty) writeSave(); });
       if (doc.dirty) markDirty();
-      mkBtn(bar, "Скачать копию", function () {
+      mkBtn(bar, T("Скачать копию"), function () {
         download((sel.kind === "ls" ? sel.key : sel.db + "_" + sel.key), typeof doc.raw === "string" ? doc.raw : JSON.stringify(doc.raw));
-      }).title = "Файл с текущим содержимым — на всякий случай";
+      }).title = T("Файл с текущим содержимым — на всякий случай");
       if (sel.kind === "ls" && localStorage.getItem(BAK + sel.key) != null) {
-        mkBtn(bar, "Вернуть оригинал", function () {
-          if (!confirm("Вернуть сейв к состоянию до первой правки из меню?")) return;
+        mkBtn(bar, T("Вернуть оригинал"), function () {
+          if (!confirm(T("Вернуть сейв к состоянию до первой правки из меню?"))) return;
           localStorage.setItem(sel.key, localStorage.getItem(BAK + sel.key));
           localStorage.removeItem(BAK + sel.key);
-          openSave(sel); toast("Оригинал возвращён");
+          openSave(sel); toast(T("Оригинал возвращён"));
         });
       }
     }
     list.appendChild(bar);
     section(list, sel.kind === "ls" ? "localStorage: " + sel.key : "IndexedDB: " + sel.db + " / " + sel.store + " / " + sel.key);
-    if (!doc) { list.appendChild(el("div", "tm-msg", "Читаю…")); return; }
-    list.appendChild(el("div", "tm-msg", "Формат: " + KIND[doc.kind] + ". Правки записываются кнопкой «Записать правки»; игра увидит их, когда загрузит этот сейв."));
+    if (!doc) { list.appendChild(el("div", "tm-msg", T("Читаю…"))); return; }
+    list.appendChild(el("div", "tm-msg", T("Формат: ") + KIND[doc.kind] + T(". Правки записываются кнопкой «Записать правки»; игра увидит их, когда загрузит этот сейв.")));
     if (doc.kind === "text") {
       var tb = el("div", "tm-scanbar");
-      mkBtn(tb, "Изменить текст…", function () {
+      mkBtn(tb, T("Изменить текст…"), function () {
         var v = prompt(sel.key + ":", String(doc.data));
         if (v !== null) { doc.data = v; doc.dirty = true; rerender(); }
       });
@@ -788,7 +797,7 @@
     }
     var fields = flatten(doc.data);
     var fbar = el("div", "tm-filter"), inp = el("input", "tm-finput");
-    inp.placeholder = "фильтр по полю… (" + fields.length + ")"; inp.value = saveFilter;
+    inp.placeholder = T("фильтр по полю… (") + fields.length + ")"; inp.value = saveFilter;
     inp.addEventListener("input", function () {
       saveFilter = inp.value.toLowerCase();
       Array.prototype.forEach.call(list.querySelectorAll(".tm-row"), function (r) {
@@ -804,15 +813,15 @@
         setPath(doc.data, f.path, v); f.v = v; markDirty();
         h.setV(typeof v === "string" && v.length > 60 ? v.slice(0, 60) + "…" : String(v));
       }
-      if (typeof f.v === "boolean") mkIco(h.ctrl, "swap", "вкл/выкл", function () { put(!f.v); }, "Переключить");
-      else mkIco(h.ctrl, "edit", "ввод", function () {
+      if (typeof f.v === "boolean") mkIco(h.ctrl, "swap", T("вкл/выкл"), function () { put(!f.v); }, T("Переключить"));
+      else mkIco(h.ctrl, "edit", T("ввод"), function () {
         var v = prompt(f.name + ":", String(f.v));
         if (v === null) return;
-        if (typeof f.v === "number") { if (v.trim() === "" || isNaN(Number(v))) { toast("Нужно число", true); return; } put(Number(v)); }
+        if (typeof f.v === "number") { if (v.trim() === "" || isNaN(Number(v))) { toast(T("Нужно число"), true); return; } put(Number(v)); }
         else put(v);
-      }, "Ввести значение");
+      }, T("Ввести значение"));
     });
-    if (fields.length > 1500) list.appendChild(el("div", "tm-msg", "Показаны первые 1500 полей — сузь фильтром."));
+    if (fields.length > 1500) list.appendChild(el("div", "tm-msg", T("Показаны первые 1500 полей — сузь фильтром.")));
   }
 
   function renderSaves(list) {
@@ -821,33 +830,33 @@
     var keys = [];
     try { for (var i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i)); } catch (e) {}
     keys = keys.filter(function (k) { return !isOurKey(k); }).sort();
-    if (!keys.length) list.appendChild(el("div", "tm-msg", "Пусто: игра не хранит сейвы в localStorage (у RPG Maker на ПК они в файлах — их правит редактор сохранений студии)."));
+    if (!keys.length) list.appendChild(el("div", "tm-msg", T("Пусто: игра не хранит сейвы в localStorage (у RPG Maker на ПК они в файлах — их правит редактор сохранений студии).")));
     keys.forEach(function (k) {
       var raw = localStorage.getItem(k) || "";
-      var h = row(list, k, kb(raw.length * 2) + (localStorage.getItem(BAK + k) != null ? ", есть копия" : ""));
-      mkBtn(h.ctrl, "открыть", function () { openSave({ kind: "ls", key: k }); });
+      var h = row(list, k, kb(raw.length * 2) + (localStorage.getItem(BAK + k) != null ? T(", есть копия") : ""));
+      mkBtn(h.ctrl, T("открыть"), function () { openSave({ kind: "ls", key: k }); });
     });
     section(list, "IndexedDB");
-    if (!window.indexedDB) { list.appendChild(el("div", "tm-msg", "IndexedDB недоступна.")); return; }
+    if (!window.indexedDB) { list.appendChild(el("div", "tm-msg", T("IndexedDB недоступна."))); return; }
     if (!idbInfo) {
       var b = el("div", "tm-scanbar");
-      mkBtn(b, "Показать базы", function () { toast("Читаю базы…"); idbScan(function (dbs) { idbInfo = dbs; if (tab === "saves") rerender(); }); });
+      mkBtn(b, T("Показать базы"), function () { toast(T("Читаю базы…")); idbScan(function (dbs) { idbInfo = dbs; if (tab === "saves") rerender(); }); });
       list.appendChild(b);
       return;
     }
-    if (!idbInfo.length) list.appendChild(el("div", "tm-msg", "Баз нет."));
+    if (!idbInfo.length) list.appendChild(el("div", "tm-msg", T("Баз нет.")));
     idbInfo.forEach(function (db) {
       db.stores.forEach(function (st) {
-        list.appendChild(el("div", "tm-msg", db.name + " / " + st.name + ": записей " + st.keys.length));
+        list.appendChild(el("div", "tm-msg", db.name + " / " + st.name + T(": записей ") + st.keys.length));
         st.keys.slice(0, 200).forEach(function (key) {
           var h = row(list, "  " + String(key), "");
           h.row.querySelector(".v").remove();
-          mkBtn(h.ctrl, "открыть", function () { openSave({ kind: "idb", db: db.name, store: st.name, key: key }); });
+          mkBtn(h.ctrl, T("открыть"), function () { openSave({ kind: "idb", db: db.name, store: st.name, key: key }); });
         });
       });
     });
     var rb = el("div", "tm-scanbar");
-    mkBtn(rb, "Перечитать базы", function () { idbInfo = null; rerender(); });
+    mkBtn(rb, T("Перечитать базы"), function () { idbInfo = null; rerender(); });
     list.appendChild(rb);
   }
 
@@ -857,7 +866,7 @@
     var any = false;
     Object.keys(frozen).forEach(function (k) {
       any = true;
-      try { if (A.ready() && frozen[k].get() !== frozen[k].v) { jMark(k, "заморозка"); frozen[k].set(frozen[k].v); } } catch (e) {}
+      try { if (A.ready() && frozen[k].get() !== frozen[k].v) { jMark(k, T("заморозка")); frozen[k].set(frozen[k].v); } } catch (e) {}
     });
     if (overlay && (tab === "vals" || tab === "game")) live.forEach(function (f) { try { f(); } catch (e) {} });
     if (!overlay && !any) { clearInterval(liveTimer); liveTimer = null; }
@@ -868,7 +877,7 @@
     if (!bodyEl) return;
     live = [];
     bodyEl.innerHTML = "";
-    if (!A.ready()) { bodyEl.appendChild(el("div", "tm-msg", A.footMissing || "Данные игры недоступны.")); return; }
+    if (!A.ready()) { bodyEl.appendChild(el("div", "tm-msg", A.footMissing || T("Данные игры недоступны."))); return; }
     if (tab === "game" && !hasGameTab()) tab = "vals";
     if (tab === "vals") renderVals(bodyEl);
     else if (tab === "game") renderGame(bodyEl);
@@ -930,13 +939,13 @@
 
     var head = el("div"); head.id = "tm-head";
     head.appendChild(el("span", "dot"));
-    var t = el("div", "t"); t.innerHTML = "TEST MENU<small>" + (A.title || "") + "</small>"; head.appendChild(t);
-    mkBtn(head, "X", close).title = "Закрыть";
+    var t = el("div", "t"); t.innerHTML = "TEST MENU<small>" + T(A.title || "") + "</small>"; head.appendChild(t);
+    mkBtn(head, "X", close).title = T("Закрыть");
     winEl.appendChild(head);
     enableDrag(head);
 
     var tabs = el("div"); tabs.id = "tm-tabs";
-    [["vals", "Значения"], ["game", "Игра"], ["scan", "Сканер"], ["saves", "Сейвы"], ["act", "Экшены"]].forEach(function (d) {
+    [["vals", T("Значения")], ["game", T("Игра")], ["scan", T("Сканер")], ["saves", T("Сейвы")], ["act", T("Экшены")]].forEach(function (d) {
       if (d[0] === "game" && !hasGameTab()) return;
       var b = mkBtn(tabs, d[1], function () { tab = d[0]; Array.prototype.forEach.call(tabs.children, function (o) { o.className = ""; }); b.className = "on"; saveState(); rerender(); });
       if (d[0] === tab) b.className = "on";
@@ -944,7 +953,7 @@
     winEl.appendChild(tabs);
 
     var tools = el("div"); tools.id = "tm-tools";
-    tools.appendChild(el("span", null, "шаг:"));
+    tools.appendChild(el("span", null, T("шаг:")));
     var seg = el("div", "seg");
     [1, 10, 100].forEach(function (s) {
       var b = mkBtn(seg, "×" + s, function () { step = s; Array.prototype.forEach.call(seg.children, function (o) { o.className = ""; }); b.className = "on"; saveState(); });
@@ -957,8 +966,8 @@
 
     var foot = el("div"); foot.id = "tm-foot";
     foot.innerHTML = A.ready()
-      ? "<kbd>Shift</kbd>+<kbd>T</kbd> меню | <kbd>Esc</kbd> закрыть | тяни за шапку"
-      : (A.footMissing || "Данные игры недоступны.");
+      ? T("<kbd>Shift</kbd>+<kbd>T</kbd> меню | <kbd>Esc</kbd> закрыть | тяни за шапку")
+      : (A.footMissing || T("Данные игры недоступны."));
     winEl.appendChild(foot);
 
     overlay.appendChild(winEl);

@@ -20,7 +20,7 @@ window.TM_ADAPTER = {
       if (!type) return null;
       return { name: k, type: type, get: function () { return v[k]; }, set: function (x) { v[k] = x; } };
     }).filter(Boolean);
-    return [{ title: "Переменные истории", rows: rows }];
+    return [{ title: T("Переменные истории"), rows: rows }];
   },
 
   nums: function () {
@@ -32,12 +32,12 @@ window.TM_ADAPTER = {
   actions: function () {
     var v = tmStoryVars();
     return [
-      { label: "Все числовые +100", run: function () { if (v) Object.keys(v).forEach(function (k) { if (typeof v[k] === "number") v[k] += 100; }); } },
-      { label: "Все флаги = true", run: function () { if (v) Object.keys(v).forEach(function (k) { if (typeof v[k] === "boolean") v[k] = true; }); } },
-      { label: "Переменные → в консоль", desc: "console.log(State.variables)", run: function () { console.log("[TM] State.variables:", v); } },
-      { label: "Своя команда (JS)…", desc: "доступна vars = State.variables", run: function () { var c = prompt("JS:", "vars.money += 100"); if (c) (function (vars) { eval(c); })(v); } }
+      { label: T("Все числовые +100"), run: function () { if (v) Object.keys(v).forEach(function (k) { if (typeof v[k] === "number") v[k] += 100; }); } },
+      { label: T("Все флаги = true"), run: function () { if (v) Object.keys(v).forEach(function (k) { if (typeof v[k] === "boolean") v[k] = true; }); } },
+      { label: T("Переменные → в консоль"), desc: "console.log(State.variables)", run: function () { console.log("[TM] State.variables:", v); } },
+      { label: T("Своя команда (JS)…"), desc: T("доступна vars = State.variables"), run: function () { var c = prompt("JS:", "vars.money += 100"); if (c) (function (vars) { eval(c); })(v); } }
     ];
   },
 
-  footMissing: "SugarCube не обнаружен — этот PoC рассчитан на SugarCube-истории."
+  footMissing: T("SugarCube не обнаружен — этот PoC рассчитан на SugarCube-истории.")
 };
