@@ -10,6 +10,15 @@ bad()/err() считаются проблемами: exit_code() даёт по �
 чтобы студия и скрипты видели провал, а не вечный «код 0».
 """
 
+import sys
+
+# консоль не в UTF-8 (cp1252 в CI, старые cmd): кириллица не должна ронять вывод
+for _s in (sys.stdout, sys.stderr):
+    try:
+        _s.reconfigure(errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
 OK, BAD, WARN, NOTE = "[OK]", "[X]", "[?]", "[!]"
 
 _problems = 0
