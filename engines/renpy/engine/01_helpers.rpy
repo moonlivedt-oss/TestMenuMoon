@@ -152,7 +152,7 @@ init -5 python:
         out = []
         for t, where, p, old, new, who in reversed(tm_ui.changelog[-limit:]):
             out.append((time.strftime("%H:%M:%S", time.localtime(t)), tm_nice(p, p)[0],
-                        u"%s → %s" % (tm_str(old), tm_str(new)), who, where))
+                        tm_str(old) + u" → " + tm_str(new), who, where))
         return out
 
     def tm_log_clear():
