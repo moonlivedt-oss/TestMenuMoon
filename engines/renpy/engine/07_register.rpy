@@ -27,6 +27,7 @@ init python:
     def _tm_on_interact():
         _tm_theme_check()
         _tm_apply_frozen()
+        _tm_log_tick()
         if tm_ui.auto:
             _tm_auto_interact()
         else:

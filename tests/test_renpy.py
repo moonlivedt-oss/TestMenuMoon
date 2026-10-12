@@ -955,3 +955,10 @@ def test_deploy_does_not_hide_menu_files():
         tmdeploy.quick_install(game)
         assert hidden(eng)
         ctypes.windll.kernel32.SetFileAttributesW(eng, 0x20)
+
+
+def test_engine_has_change_journal():
+    eng = _engine_text()
+    for key in ("def _tm_log_tick", "_tm_log_tick()", "screen tm_log_popup", 'u"заморозка"',
+                "== Журнал изменений", "self.changelog = []"):
+        assert key in eng, key

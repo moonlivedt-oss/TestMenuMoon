@@ -163,6 +163,8 @@ screen tm_menu():
         use tm_edit_popup
     elif tm_ui.where_open:
         use tm_where_popup
+    elif getattr(tm_ui, "log_open", False):
+        use tm_log_popup
     elif tm_ui.diag_open:
         use tm_diag_popup
     elif tm_ui.help_open:
@@ -267,6 +269,53 @@ screen tm_where_popup():
                     spacing 10
                     use tm_btn2("save", "Отчёт в файл", Function(tm_write_report), "Записать отчёт тестера (место, история выборов, правки) в папку игры")
                     textbutton "Закрыть" style "tm_btn" text_style "tm_btn_text" action SetField(tm_ui, "where_open", False)
+
+# ---------------------- попап: журнал изменений ----------------------
+screen tm_log_popup():
+    modal True
+    zorder 300
+    $ _rows = tm_log_rows(18)
+    key "dismiss" action NullAction()
+    key "game_menu" action SetField(tm_ui, "log_open", False)
+    button:
+        style "tm_shade"
+        xfill True
+        yfill True
+        background "#000000b0"
+        action SetField(tm_ui, "log_open", False)
+    frame at tm_pop(tm_k()):
+        style "tm_border"
+        xalign 0.5
+        yalign 0.5
+        padding (2, 2)
+        frame:
+            style "tm_panel"
+            xsize 1100
+            padding (24, 20)
+            vbox:
+                spacing 10
+                hbox:
+                    spacing 10
+                    use tm_icon("stats", 32)
+                    text "Журнал изменений" style "tm_h" yalign 0.5
+                    text ("последние %d из %d" % (len(_rows), len(tm_ui.changelog))) style "tm_dim" yalign 0.5
+                if not _rows:
+                    text "Пока ничего не менялось. Журнал ведёт статы, избранное, HUD и заморозки." style "tm_dim"
+                # последние 18 — на экран; весь журнал (до 300) — в «Отчёт тестера»
+                for _t, _n, _ch, _who, _wh in _rows:
+                    hbox:
+                        spacing 14
+                        text tm_q(_t) style "tm_dim" size 16 min_width 90
+                        text tm_q(_n) style "tm_label" size 17 min_width 330
+                        text tm_q(_ch) style "tm_value" size 17 min_width 260
+                        text tm_q(_who) style ("tm_warn" if _who == u"игра" else "tm_dim") size 16 min_width 110
+                        text tm_q(_wh) style "tm_dim" size 15
+                hbox:
+                    xalign 1.0
+                    spacing 10
+                    use tm_btn2("save", "Отчёт в файл", Function(tm_write_report), "Отчёт тестера с полным журналом изменений")
+                    textbutton "Очистить" style "tm_btn" text_style "tm_btn_text" action Function(tm_log_clear)
+                    textbutton "Закрыть" style "tm_btn" text_style "tm_btn_text" action SetField(tm_ui, "log_open", False)
 
 # ---------------------- попап: как пользоваться ----------------------
 screen tm_help_popup():

@@ -19,7 +19,9 @@
  *    cheats() : [ { label, desc?, get(), set(bool) } ] — режимы-переключатели
  *    places   : { here(): {name, ...} | null, go(p) } — точки телепорта (хранятся в localStorage)
  *    jumps    : { title, load(cb) } — cb([{ name, hint?, go() }]): список мест для перехода (карты)
- *  У строки «Значений» может быть where(cb) — cb([строки]): где игра меняет и проверяет значение.
+ *  У строки «Значений» может быть where(cb) — cb([строки]): где игра меняет и проверяет значение
+ *  (ответ может прийти и при закрытом меню — покажется при следующем открытии);
+ *  whereHint / whereTip — свой текст тоста и подсказки кнопки «где».
  * ==========================================================================*/
 (function () {
   if (window.__TM_MENU__) return;
@@ -155,6 +157,45 @@
     }, 500);
   })();
 
+  // --- журнал изменений: раз в секунду сверяются значения «Значений»; изменение без
+  // пометки — «игра», правка из меню и возврат заморозкой помечаются там, где делаются
+  var changelog = [], jPrev = {}, jSrc = {}, J_MAX = 300, J_ROWS = 400;
+  function jMark(key, who) { jSrc[key] = who; }
+  function journalTick() {
+    var rows;
+    try { if (!A.ready()) return; rows = rowsByKey(); } catch (e) { return; }
+    var keys = Object.keys(rows).slice(0, J_ROWS), now = new Date();
+    keys.forEach(function (k) {
+      var v;
+      try { v = rows[k].get(); } catch (e) { return; }
+      var t = typeof v;
+      if (!(t === "number" || t === "string" || t === "boolean")) return;
+      if (k in jPrev && jPrev[k] !== v) {
+        changelog.push({ t: now, key: k, from: jPrev[k], to: v, who: jSrc[k] || "игра" });
+      }
+      jPrev[k] = v;
+    });
+    jSrc = {};
+    if (changelog.length > J_MAX) changelog.splice(0, changelog.length - J_MAX);
+  }
+  setInterval(journalTick, 1000);
+  function hhmmss(d) { return d.toTimeString().slice(0, 8); }
+  function journalLines() {
+    return changelog.slice().reverse().map(function (c) {
+      return hhmmss(c.t) + "  " + c.key + ": " + fmt(c.from) + " → " + fmt(c.to) + "  (" + c.who + ")";
+    });
+  }
+  function showJournal() {
+    var lines = journalLines();
+    showInfo("Журнал изменений (" + changelog.length + ")",
+      lines.length ? lines.slice(0, 200) : ["Пока ничего не менялось. Журнал сверяет «Значения» раз в секунду."],
+      [["Скачать", function () {
+        var a = el("a");
+        a.href = URL.createObjectURL(new Blob([journalLines().reverse().join("\n")], { type: "text/plain" }));
+        a.download = "tm_journal.txt"; document.body.appendChild(a); a.click(); a.remove();
+      }], ["Очистить", function () { changelog = []; showJournal(); }]]);
+  }
+
   // ------------------------------------------------------------------ стиль
   function injectCss() {
     if (document.getElementById("tm-style")) return;
@@ -195,6 +236,7 @@
       "#tm-head button:focus-visible{outline-color:#0a0c10}",
       "@media(prefers-reduced-motion:reduce){#tm-ov,#tm-win{animation:none}#tm-win *,.tm-row,.tm-act,.tm-row .ctrl button{transition:none!important}.tm-act:hover,.tm-row .ctrl button:hover{transform:none}}",
       ".tm-filter{padding:2px 2px 10px;position:sticky;top:-10px;background:rgba(20,25,35,.98);z-index:1}",
+      ".tm-filter{display:flex;gap:8px}.tm-jbtn{flex:none;background:#ffffff0d;color:#c7ccd4;border:1px solid #313a4c;border-radius:10px;padding:0 12px;cursor:pointer;font-size:12.5px;font-weight:700}",
       ".tm-finput{width:100%;box-sizing:border-box;background:#0b0e14;border:1px solid #313a4c;border-radius:10px;",
       "color:#e7ebf2;padding:9px 12px;font-size:13px;outline:none;transition:border-color .12s,box-shadow .12s}",
       ".tm-finput:focus{border-color:" + ACCENT + ";box-shadow:0 0 0 3px " + ACCENT + "22}",
@@ -299,7 +341,10 @@
     var inp = el("input", "tm-finput");
     inp.type = "text"; inp.placeholder = "фильтр по имени…"; inp.value = filter;
     inp.addEventListener("input", function () { filter = inp.value.toLowerCase(); applyFilter(list); });
-    fbar.appendChild(inp); list.appendChild(fbar);
+    fbar.appendChild(inp);
+    var jb = mkBtn(fbar, "журнал: " + changelog.length, showJournal);
+    jb.className = "tm-jbtn"; jb.title = "Что, когда и кем изменено: игрой, меню или заморозкой";
+    list.appendChild(fbar);
 
     secs.forEach(function (sec) {
       if (sec.title) section(list, sec.title);
@@ -308,12 +353,12 @@
         var fkey = (sec.title || "") + "/" + r.name;
         function rf() { h.setV(fmt(r.get(), r.type)); }
         // правка замороженного значения = новое удерживаемое значение
-        function put(v) { r.set(v); if (frozen[fkey]) frozen[fkey].v = r.get(); rf(); }
+        function put(v) { jMark(fkey, "меню"); r.set(v); if (frozen[fkey]) frozen[fkey].v = r.get(); rf(); }
         live.push(rf);
         if (r.where) mkBtn(h.ctrl, "где", function () {
-          toast("Ищу в событиях игры…");
-          r.where(function (lines) { showInfo(r.name, lines); });
-        }).title = "Где игра меняет и проверяет это значение";
+          toast(A.whereHint || "Ищу в событиях игры…");
+          r.where(function (lines) { whereDone(r.name, lines); });
+        }).title = A.whereTip || "Где игра меняет и проверяет это значение";
         if (r.type === "num") {
           mkBtn(h.ctrl, "−", function () { put(r.get() - step); });
           mkBtn(h.ctrl, "+", function () { put(r.get() + step); });
@@ -325,22 +370,31 @@
           fb.title = "Заморозить: игра не сможет изменить значение";
           if (frozen[fkey]) { frozen[fkey].set = r.set; frozen[fkey].get = r.get; fb.className = "on"; }
         } else if (r.type === "bool") {
-          mkIco(h.ctrl, "swap", "вкл/выкл", function () { r.set(!r.get()); rf(); }, "Переключить");
+          mkIco(h.ctrl, "swap", "вкл/выкл", function () { jMark(fkey, "меню"); r.set(!r.get()); rf(); }, "Переключить");
         } else {
-          mkIco(h.ctrl, "edit", "ввод", function () { var v = prompt(r.name + ":", String(r.get())); if (v !== null) { r.set(v); rf(); } }, "Ввести значение");
+          mkIco(h.ctrl, "edit", "ввод", function () { var v = prompt(r.name + ":", String(r.get())); if (v !== null) { jMark(fkey, "меню"); r.set(v); rf(); } }, "Ввести значение");
         }
       });
     });
     applyFilter(list);
   }
 
+  // ответ «где»: меню открыто — сразу, закрыто — по следующему открытию (и уведомление)
+  var pendingInfo = null;
+  function whereDone(title, lines) {
+    if (bodyEl) { showInfo(title, lines); return; }
+    pendingInfo = [title, lines];
+    notice("TEST MENU: «" + title + "» — готово, открой меню (Shift+T)");
+  }
+
   // окно-справка поверх вкладки: «← назад» возвращает список
-  function showInfo(title, lines) {
+  function showInfo(title, lines, extra) {
     if (!bodyEl) return;
     live = [];
     bodyEl.innerHTML = "";
     var bar = el("div", "tm-scanbar");
     mkBtn(bar, "← назад", rerender);
+    (extra || []).forEach(function (b) { mkBtn(bar, b[0], b[1]); });
     bodyEl.appendChild(bar);
     section(bodyEl, title);
     lines.forEach(function (l) { bodyEl.appendChild(el("div", "tm-msg", l)); });
@@ -736,7 +790,7 @@
     var any = false;
     Object.keys(frozen).forEach(function (k) {
       any = true;
-      try { if (A.ready() && frozen[k].get() !== frozen[k].v) frozen[k].set(frozen[k].v); } catch (e) {}
+      try { if (A.ready() && frozen[k].get() !== frozen[k].v) { jMark(k, "заморозка"); frozen[k].set(frozen[k].v); } } catch (e) {}
     });
     if (overlay && (tab === "vals" || tab === "game")) live.forEach(function (f) { try { f(); } catch (e) {} });
     if (!overlay && !any) { clearInterval(liveTimer); liveTimer = null; }
@@ -844,6 +898,7 @@
     document.body.appendChild(overlay);
     if (winPos && winPos.left) { winEl.style.position = "fixed"; winEl.style.margin = "0"; winEl.style.left = winPos.left; winEl.style.top = winPos.top; clampWin(); }
     rerender();
+    if (pendingInfo) { showInfo(pendingInfo[0], pendingInfo[1]); pendingInfo = null; }
     startTick();
   }
 

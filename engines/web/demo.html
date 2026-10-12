@@ -28,6 +28,15 @@
     // заглушка Construct 2: глобальные переменные проекта
     var c2vars = [{ name: "Coins", data: 7 }, { name: "Stage", data: 2 }, { name: "Nickname", data: "Moon" }];
     function cr_getC2Runtime() { return { all_global_vars: c2vars }; }
+    // заглушка Construct 3 (режим DOM): IRuntime с globalVars-аксессорами и экземплярами
+    var c3state = { Lives: 3, Boss: "Golem" };
+    var c3gv = {};
+    Object.keys(c3state).forEach(function (k) {
+      Object.defineProperty(c3gv, k, { get: function () { return c3state[k]; }, set: function (v) { c3state[k] = v; } });
+    });
+    var c3_runtimeInterface = { _localRuntime: { GetIRuntime: function () {
+      return { globalVars: c3gv, objects: { Player: { getAllInstances: function () { return [{ instVars: { ammo: 12, shield: false } }]; } } } };
+    } } };
 
     var x = 20, dir = 1, last = null, acc = 0;
     var ctx = document.getElementById("c").getContext("2d");

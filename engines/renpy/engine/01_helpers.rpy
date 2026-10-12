@@ -79,12 +79,85 @@ init -5 python:
         renpy.restart_interaction()
 
     def _tm_after_edit(path, value):
+        _tm_log_src(path, u"меню")
         if path in tm_ui.frozen:        # правка замороженного стата = новое удерживаемое значение
             tm_ui.frozen[path] = value
         # своя правка — не «изменение игрой»: базовый снимок обновляем, отметку убираем
         if tm_ui.seen is not None:
             tm_ui.seen[path] = value
         tm_ui.deltas.pop(path, None)
+
+    # ---------------- журнал изменений: кто, когда и где менял значения ----------------
+    # На каждом взаимодействии сверяются отслеживаемые пути (статы data/авто, избранное,
+    # HUD, заморозки). Изменение без пометки — «игра»; правку из меню и возврат заморозкой
+    # помечают _tm_after_edit и _tm_apply_frozen. Только скаляры: их можно хранить как есть.
+    TM_LOG_MAX = 300
+    TM_LOG_PATHS = 300
+
+    def _tm_log_src(path, who):
+        try:
+            tm_ui.log_src[path] = who
+        except Exception:
+            pass
+
+    def _tm_log_paths():
+        ps = []
+        for r in tm_all_stats():
+            if r[1] and r[1] not in ps:
+                ps.append(r[1])
+            if len(ps) >= TM_LOG_PATHS:
+                break
+        for p in list(tm_ui.frozen) + [w[1] for w in tm_ui.watch] + list(tm_ui.favs):
+            if p not in ps:
+                ps.append(p)
+        return ps
+
+    def _tm_log_where():
+        try:
+            fn, ln = renpy.get_filename_line()
+            return tm_label_at(fn, ln) or (u"%s:%d" % (fn, ln))
+        except Exception:
+            return u""
+
+    def _tm_log_tick():
+        if store.main_menu or not hasattr(tm_ui, "changelog"):
+            return
+        try:
+            paths = _tm_log_paths()
+        except Exception:
+            return
+        prev, src = tm_ui.log_prev, tm_ui.log_src
+        now, where = tm_now(), None
+        for p in paths:
+            had, v = tm_probe(p)
+            if not had or not (isinstance(v, (_TM_NUM, _TM_STR, bool)) or v is None):
+                continue
+            if p in prev:
+                old = prev[p]
+                try:
+                    same = old == v and type(old) is type(v)
+                except Exception:
+                    same = True
+                if not same:
+                    if where is None:
+                        where = _tm_log_where()
+                    tm_ui.changelog.append((now, where, p, old, v, src.pop(p, u"игра")))
+            prev[p] = v
+        src.clear()
+        del tm_ui.changelog[:-TM_LOG_MAX]
+
+    def tm_log_rows(limit=60):
+        # строки окна журнала, новые сверху: (время, имя, было -> стало, кто, где)
+        import time
+        out = []
+        for t, where, p, old, new, who in reversed(tm_ui.changelog[-limit:]):
+            out.append((time.strftime("%H:%M:%S", time.localtime(t)), tm_nice(p, p)[0],
+                        u"%s → %s" % (tm_str(old), tm_str(new)), who, where))
+        return out
+
+    def tm_log_clear():
+        tm_ui.changelog = []
+        renpy.restart_interaction()
 
     # ---------------- журнал правок и отмена ----------------
     def _tm_journal_add(path, old, new):
@@ -626,6 +699,7 @@ init -5 python:
                 cur = renpy.python.py_eval(path)
                 if (cur != v) if m == "eq" else ((cur < v) if m == "ge" else (cur > v)):
                     _tm_assign(path, v)
+                    _tm_log_src(path, u"заморозка")
             except Exception:
                 pass                    # главное меню / другой сейв: пути может не быть
 

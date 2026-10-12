@@ -689,3 +689,12 @@ def test_web_unpacks_packed_nwjs_game():
         assert eng.installed(tmp) and eng.current(tmp)
         eng.uninstall(tmp)
         assert not eng.installed(tmp) and os.path.isdir(pkg)
+
+
+def test_web_journal_where_and_construct3_present():
+    core = open(os.path.join(ROOT, "engines", "_shared", "tm_menu_core.js"), encoding="utf-8").read()
+    for key in ("function journalTick", 'jMark(fkey, "меню")', 'jMark(k, "заморозка")', "function whereDone"):
+        assert key in core, key
+    web = open(os.path.join(ROOT, "engines", "web", "tm_menu.js"), encoding="utf-8").read()
+    for key in ("function tmwWatch", "where: function", "function tmwConstruct3", "c3_runtimeInterface", "globalVars"):
+        assert key in web, key

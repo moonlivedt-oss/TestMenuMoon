@@ -199,6 +199,11 @@ screen tm_tab_stats():
             if tm_ui.stat_filter:
                 use tm_icobtn("close", [SetField(tm_ui, "stat_filter", ""), SetField(tm_ui, "stat_page", 0)], tip="Очистить фильтр", alt="X")
             text ("найдено: %d" % _total) style "tm_dim" yalign 0.5
+            textbutton ("журнал: %d" % len(getattr(tm_ui, "changelog", []))):
+                style "tm_seg" text_style "tm_seg_text"
+                yalign 0.5
+                tooltip "Журнал изменений: что, когда и где поменяли игра, меню или заморозка"
+                action SetField(tm_ui, "log_open", True)
             if tm_ui.deltas:
                 textbutton ("изменённые: %d" % len(tm_ui.deltas)):
                     style "tm_seg" text_style "tm_seg_text"

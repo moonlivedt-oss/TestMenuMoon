@@ -1,6 +1,8 @@
 /* Любая HTML5-игра — адаптер данных для общего UI-ядра (_shared/tm_menu_core.js).
    Переменных игры заранее не знаем, поэтому ищем их в рантайме:
      - Construct 2: глобальные переменные проекта (cr_getC2Runtime().all_global_vars);
+     - Construct 3: глобальные переменные и переменные экземпляров (IRuntime; режим DOM
+       или runtime, выставленный скриптом проекта — в режиме воркера недоступно);
      - GDevelop: переменные игры и текущей сцены (сцену ловим через renderAndStep);
      - Phaser 3: registry и data активных сцен;
      - остальное: глобалы страницы, которых нет в чистом window (сравнение с пустым
@@ -30,6 +32,51 @@ function tmwBaseline() {
   } catch (e) {}
   TMW.base = b;
   return b;
+}
+
+// --- «где меняется»: на время слежки свойство становится аксессором, и каждая запись
+// запоминает стек вызова. Итог — функции игры, которые пишут это значение, и сколько раз.
+var TMW_WATCH_MS = 15000;
+function tmwWatch(owner, key, name, cb) {
+  var d;
+  try { d = Object.getOwnPropertyDescriptor(owner, key); } catch (e) {}
+  if (!d || !("value" in d) || !d.configurable) {
+    cb(["Это значение не отследить: свойство нельзя перенастроить (var на странице, " +
+        "замороженный объект или геттер движка). Попробуй поле объекта уровнем ниже."]);
+    return;
+  }
+  var value = d.value, hits = {}, total = 0, prog = "", seen = 0;
+  Object.defineProperty(owner, key, {
+    configurable: true, enumerable: d.enumerable,
+    get: function () { return value; },
+    set: function (v) {
+      if (v !== value) {
+        total++;
+        var st = String((new Error()).stack || "").split("\n").slice(2)
+          .filter(function (l) { return l.indexOf("tmwWatch") < 0 && /\S/.test(l); })
+          .slice(0, 3).map(function (l) { return l.trim().replace(/^at /, ""); }).join("  <-  ");
+        if (!hits[st]) { hits[st] = { n: 0, from: value, to: v }; seen++; }
+        hits[st].n++; hits[st].to = v;
+      }
+      value = v;
+    }
+  });
+  setTimeout(function () {
+    try { Object.defineProperty(owner, key, { configurable: true, enumerable: d.enumerable, writable: true, value: value }); } catch (e) {}
+    var lines = ["Слежка " + TMW_WATCH_MS / 1000 + " с: изменений " + total + ", мест в коде " + seen + "."];
+    Object.keys(hits).sort(function (a, b) { return hits[b].n - hits[a].n; }).slice(0, 12).forEach(function (st) {
+      var h = hits[st];
+      lines.push("×" + h.n + "  (" + h.from + " → " + h.to + ")  " + (st || "без стека (изменилось из встроенного кода)"));
+    });
+    if (!total) lines.push("Игра не меняла значение. Сделай в игре то, что должно его менять, и запусти снова.");
+    cb(lines);
+  }, TMW_WATCH_MS);
+}
+function tmwRow(owner, key, name, type) {
+  return { name: name, type: type,
+    get: function () { return owner[key]; },
+    set: function (x) { owner[key] = x; },
+    where: function (cb) { tmwWatch(owner, key, name, cb); } };
 }
 
 function tmwType(v) {
@@ -64,9 +111,7 @@ function tmwWalk(obj, path, depth, out, seen) {
     var name = Array.isArray(obj) ? path + "[" + k + "]" : (path ? path + "." + k : k);
     var t = tmwType(v);
     if (t) {
-      out.push({ name: name, type: t,
-        get: function () { return obj[k]; },
-        set: function (x) { obj[k] = x; } });
+      out.push(tmwRow(obj, k, name, t));
     } else if (depth > 0 && v && typeof v === "object") {
       tmwWalk(v, name, depth - 1, out, seen);
     }
@@ -86,9 +131,53 @@ function tmwConstruct2(secs) {
   var gv = (rt && rt.all_global_vars) || [], rows = [];
   gv.forEach(function (v) {
     var t = tmwType(v.data);
-    if (t) rows.push({ name: v.name, type: t, get: function () { return v.data; }, set: function (x) { v.data = x; } });
+    if (t) rows.push(tmwRow(v, "data", v.name, t));
   });
   if (rows.length) secs.push({ title: "Construct 2: глобальные переменные", rows: rows, top: true });
+}
+
+// --- Construct 3: IRuntime — из скрипта проекта (globalThis.runtime, частый приём
+// runOnStartup) или у рантайма в режиме DOM (c3_runtimeInterface._localRuntime).
+// В режиме воркера (по умолчанию в новых проектах) рантайм в другом потоке — недоступен.
+function tmwC3Runtime() {
+  var cands = [window.runtime, window.c3runtime, window.gameRuntime];
+  for (var i = 0; i < cands.length; i++) if (cands[i] && cands[i].globalVars && cands[i].objects) return cands[i];
+  var ri = window.c3_runtimeInterface;
+  if (!ri) return null;
+  try {
+    var rt = ri._localRuntime || (ri._GetLocalRuntime && ri._GetLocalRuntime());
+    return rt && rt.GetIRuntime ? rt.GetIRuntime() : null;
+  } catch (e) { return null; }
+}
+function tmwConstruct3(secs) {
+  var ir = tmwC3Runtime();
+  if (!ir) {
+    if (window.c3_runtimeInterface) TMW.c3worker = true;
+    return;
+  }
+  var gv = ir.globalVars, rows = [];
+  if (gv) Object.getOwnPropertyNames(gv).forEach(function (k) {
+    var t;
+    try { t = tmwType(gv[k]); } catch (e) { return; }
+    if (t) rows.push({ name: k, type: t, get: function () { return gv[k]; }, set: function (x) { gv[k] = x; } });
+  });
+  if (rows.length) secs.push({ title: "Construct 3: глобальные переменные", rows: rows, top: true });
+  var objs = ir.objects, inst = [];
+  if (objs) Object.keys(objs).slice(0, 60).forEach(function (type) {
+    var list;
+    try { list = objs[type].getAllInstances(); } catch (e) { return; }
+    (list || []).slice(0, 4).forEach(function (o, n) {
+      var iv = o && o.instVars;
+      if (!iv) return;
+      Object.getOwnPropertyNames(iv).forEach(function (k) {
+        var t;
+        try { t = tmwType(iv[k]); } catch (e) { return; }
+        if (t) inst.push({ name: type + (list.length > 1 ? "#" + n : "") + "." + k, type: t,
+          get: function () { return iv[k]; }, set: function (x) { iv[k] = x; } });
+      });
+    });
+  });
+  if (inst.length) secs.push({ title: "Construct 3: переменные экземпляров", rows: inst, top: true });
 }
 
 // --- GDevelop: сцену ловим на ходу (renderAndStep зовётся каждый кадр)
@@ -130,7 +219,7 @@ function tmwPhaser(game, gname, secs) {
     var rows = [];
     Object.keys(list || {}).forEach(function (k) {
       var t = tmwType(list[k]);
-      if (t) rows.push({ name: k, type: t, get: function () { return list[k]; }, set: function (x) { list[k] = x; } });
+      if (t) rows.push(tmwRow(list, k, k, t));
     });
     if (rows.length) secs.push({ title: title, rows: rows, top: true });
   }
@@ -150,22 +239,25 @@ function tmwPhaser(game, gname, secs) {
 function tmwScan() {
   var secs = [], base = tmwBaseline(), globals = [];
   tmwConstruct2(secs);
+  tmwConstruct3(secs);
   tmwGdevelop(secs);
   var objs = [];
   Object.getOwnPropertyNames(window).forEach(function (k) {
-    if (base[k] || TMW_LIBS[k] || /^(on|webkit|moz|cr_|c2|__|tm)/.test(k)) return;
+    if (base[k] || TMW_LIBS[k] || /^(on|webkit|moz|cr_|c2|c3|C3|__|tm)/.test(k)) return;
     var v;
     try { v = window[k]; } catch (e) { return; }
     if (typeof v === "function") return;
     var t = tmwType(v);
     if (t) {
-      globals.push({ name: k, type: t, get: function () { return window[k]; }, set: function (x) { window[k] = x; } });
+      globals.push(tmwRow(window, k, k, t));
       return;
     }
     if (tmwIsPhaserGame(v)) { tmwPhaser(v, k, secs); return; }
     if (v && typeof v === "object" && !tmwSkipObj(v)) objs.push(k);
   });
   if (globals.length) secs.push({ title: "Глобальные переменные", rows: globals, top: true });
+  if (TMW.c3worker && !secs.some(function (s) { return /Construct 3/.test(s.title); }))
+    secs.unshift({ title: "Construct 3: рантайм в воркере — переменные игры недоступны (видно только страницу)", rows: [] });
   var groups = [];
   objs.forEach(function (k) {
     var rows = [];
@@ -183,6 +275,9 @@ window.TM_ADAPTER = {
   ready: function () { return !!document.body; },
 
   stats: function () { return tmwScan(); },
+
+  whereHint: "Слежу 15 с: закрой меню и сделай в игре то, что меняет значение",
+  whereTip: "Кто в коде игры меняет это значение: 15 секунд слежки за записью, потом список мест",
 
   nums: function () {
     var o = {};

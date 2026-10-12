@@ -585,6 +585,10 @@ init -3 python:
             if h.get("more"):
                 L.append(u"      … и ещё %d" % h["more"])
         L.append(u"")
+        L.append(u"== Журнал изменений (%d)" % len(getattr(tm_ui, "changelog", [])))
+        for _t, _n, _ch, _who, _wh in reversed(tm_log_rows(TM_LOG_MAX)):
+            L.append(u"  %s  %s: %s  [%s]%s" % (_t, _n, _ch, _who, (u"  @" + _wh) if _wh else u""))
+        L.append(u"")
         cov = tm_coverage()
         L.append(u"== Покрытие (за все партии на этом компьютере)")
         L.append(u"  реплики: %s;  сцены: %s;  варианты выбора: %s"
