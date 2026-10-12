@@ -5,9 +5,12 @@
 значения игры: правка двойным щелчком, заморозка галочкой, темп и шаг кадра.
 """
 
+import os
+
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
+    QWidget,
     QAbstractItemView,
     QComboBox,
     QDialog,
@@ -56,9 +59,13 @@ class RemoteDialog(QDialog):
         self.info = QLabel("", objectName="dim")
         self.info.setWordWrap(True)
         v.addWidget(self.info)
+        # рабочая часть (игра на связи) и подсказка, пока связи нет
+        self.work = QWidget()
+        wv = QVBoxLayout(self.work)
+        wv.setContentsMargins(0, 0, 0, 0)
         self.combo = QComboBox()
         self.combo.currentIndexChanged.connect(self._pick)
-        v.addWidget(self.combo)
+        wv.addWidget(self.combo)
 
         self.speed_row = QHBoxLayout()
         self.speed_btns = []
@@ -71,13 +78,13 @@ class RemoteDialog(QDialog):
         self.b_step.setToolTip("Игра на паузе продвигается ровно на один кадр")
         self.b_step.clicked.connect(lambda: self._send("step"))
         self.speed_row.addWidget(self.b_step)
-        v.addLayout(self.speed_row)
+        wv.addLayout(self.speed_row)
 
         self.filter = QLineEdit()
         self.filter.setPlaceholderText("фильтр по имени…")
         self.filter.setClearButtonEnabled(True)
         self.filter.textChanged.connect(self._apply_filter)
-        v.addWidget(self.filter)
+        wv.addWidget(self.filter)
 
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(["Раздел", "Имя", "Значение", "Заморозка"])
@@ -90,7 +97,24 @@ class RemoteDialog(QDialog):
         hh.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         self.table.setColumnWidth(2, 180)
         self.table.itemChanged.connect(self._edited)
-        v.addWidget(self.table, 1)
+        wv.addWidget(self.table, 1)
+        v.addWidget(self.work, 1)
+        from tmstudio.theme import ICON_DIR
+        from tmstudio.widgets import EmptyGuide
+
+        self.guide = EmptyGuide(
+            os.path.join(ICON_DIR, "m_sleep.png"),
+            "Игра пока не на связи",
+            "Пульт показывает значения запущенной игры и меняет их прямо отсюда — удобно, когда игра "
+            "на втором мониторе или в полноэкранном режиме. Меню поверх игры открывать не нужно.",
+            [
+                ("Запусти игру", "с установленным тест-меню (HTML5, RPG Maker, Twine или Ren'Py)"),
+                ("Включи пульт", "веб-меню: вкладка «Игра» → «Пульт»; Ren'Py: «Настройки» → «Для тестера»"),
+                ("Игра появится здесь", "сама, через секунду: значения, заморозки, темп и шаг кадра"),
+            ],
+        )
+        self.guide.hide()
+        v.addWidget(self.guide, 1)
 
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.refresh)
@@ -127,7 +151,13 @@ class RemoteDialog(QDialog):
                 "вкладка «Игра», Ren'Py — «Настройки». Студия слушает 127.0.0.1:%d." % tmbridge.PORT
             )
             self.table.setRowCount(0)
+            self.info.hide()
+            self.work.hide()
+            self.guide.show()
             return
+        self.info.show()
+        self.work.show()
+        self.guide.hide()
         state = dict((g[0], g) for g in games).get(self.cid)
         if state is None:
             return

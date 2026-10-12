@@ -7,6 +7,7 @@
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QColor, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
+    QFrame,
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
@@ -26,57 +27,117 @@ from tmkit import manifest  # чтение/запись games_data.py
 from tmkit import analysis  # разбор строк кандидатов -> пары для таблицы статов
 
 from tmstudio.theme import ACCENT, hline, ibtn, mascot_box
-from tmstudio.widgets import AccentPicker
+from tmstudio.tokens import TOK
+from tmstudio.widgets import AccentPicker, FeatureCard, MenuPreview, Tile
 
 
 # ============================================================ вкладка: Основное
 class OverviewTab(QWidget):
-    """Название, заметка, цвет меню и сведения об игре. Кнопки действий — в шапке игры (окно)."""
+    """Название, заметка, цвет меню; ниже — сводка игры, «что дальше» и превью меню в игре.
+    Кнопки действий — в шапке игры (окно). on_goto(i) — открыть вкладку-шаг, on_apply — установить."""
 
-    def __init__(self, on_dirty, default_accent=ACCENT):
+    def __init__(self, on_dirty, default_accent=ACCENT, on_goto=None, on_apply=None):
         super().__init__()
         self._default_accent = default_accent
         self._on_dirty = on_dirty
-        g = QGridLayout(self)
-        g.setContentsMargins(20, 18, 20, 18)
+        self._on_goto = on_goto or (lambda _i: None)
+        self._on_apply = on_apply or (lambda: None)
+        self._rows, self._engine = [], ""
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(20, 18, 20, 18)
+        outer.setSpacing(14)
+
+        g = QGridLayout()
         g.setHorizontalSpacing(16)
         g.setVerticalSpacing(12)
-        r = 0
-        g.addWidget(QLabel("Название в меню", objectName="dim"), r, 0)
+        g.addWidget(QLabel("Название в меню", objectName="dim"), 0, 0)
         self.ed_title = QLineEdit()
         self.ed_title.setPlaceholderText("как будет подписано окно меню в игре")
         self.ed_title.textEdited.connect(on_dirty)
-        g.addWidget(self.ed_title, r, 1)
-        r += 1
-        g.addWidget(QLabel("Заметка", objectName="dim"), r, 0)
+        self.ed_title.textEdited.connect(lambda _t: self._preview())
+        g.addWidget(self.ed_title, 0, 1)
+        g.addWidget(QLabel("Заметка", objectName="dim"), 1, 0)
         self.ed_status = QLineEdit()
         self.ed_status.setPlaceholderText("для себя: что проверено, что сломано")
         self.ed_status.textEdited.connect(on_dirty)
-        g.addWidget(self.ed_status, r, 1)
-        r += 1
-        g.addWidget(QLabel("Цвет меню", objectName="dim"), r, 0)
+        g.addWidget(self.ed_status, 1, 1)
+        g.addWidget(QLabel("Цвет меню", objectName="dim"), 2, 0)
         self.accent = AccentPicker(default_accent, self._pick_color)
         self.accent.changed.connect(on_dirty)
-        g.addWidget(self.accent, r, 1)
-        r += 1
-        g.addWidget(hline(), r, 0, 1, 2)
-        r += 1
+        self.accent.changed.connect(self._preview)
+        g.addWidget(self.accent, 2, 1)
+        g.setColumnStretch(1, 1)
+        outer.addLayout(g)
+        outer.addWidget(hline())
+
+        body = QHBoxLayout()
+        body.setSpacing(18)
+        left = QVBoxLayout()
+        left.setSpacing(12)
+        tiles = QHBoxLayout()
+        tiles.setSpacing(10)
+        self.t_menu = Tile("меню в игре")
+        self.t_stats = Tile("статов")
+        self.t_give = Tile("выдача")
+        self.t_found = Tile("найдено переменных")
+        for t in (self.t_menu, self.t_stats, self.t_give, self.t_found):
+            tiles.addWidget(t, 1)
+        left.addLayout(tiles)
+
+        # «что дальше»: шаги с отметками и переходом
+        self.next_card = QFrame(objectName="card")
+        nv = QVBoxLayout(self.next_card)
+        nv.setContentsMargins(16, 12, 16, 12)
+        nv.setSpacing(6)
+        nv.addWidget(QLabel("Что дальше", objectName="h2"))
+        self.steps = []
+        for _ in range(4):
+            row = QHBoxLayout()
+            mark = QLabel()
+            mark.setFixedWidth(22)
+            text = QLabel()
+            text.setWordWrap(True)
+            btn = QPushButton()
+            btn.setObjectName("link")
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            row.addWidget(mark)
+            row.addWidget(text, 1)
+            row.addWidget(btn)
+            nv.addLayout(row)
+            self.steps.append((mark, text, btn))
+        left.addWidget(self.next_card)
+
+        info = QGridLayout()
+        info.setHorizontalSpacing(16)
+        info.setVerticalSpacing(6)
         self.info = {}
-        for key, label in (
-            ("installed", "Меню в игре"),
-            ("engine", "Движок"),
-            ("root", "Папка игры"),
-            ("launcher", "Запуск"),
+        for r, (key, label) in enumerate(
+            (("installed", "Меню в игре"), ("engine", "Движок"), ("root", "Папка игры"), ("launcher", "Запуск"))
         ):
-            g.addWidget(QLabel(label, objectName="dim"), r, 0)
+            info.addWidget(QLabel(label, objectName="dim"), r, 0)
             lb = QLabel("—", objectName="accent" if key == "installed" else "")
             lb.setWordWrap(True)
             lb.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-            g.addWidget(lb, r, 1)
+            info.addWidget(lb, r, 1)
             self.info[key] = lb
-            r += 1
-        g.setColumnStretch(1, 1)
-        g.setRowStretch(r, 1)
+        info.setColumnStretch(1, 1)
+        left.addLayout(info)
+        self.features = FeatureCard()
+        left.addWidget(self.features)
+        left.addStretch(1)
+        body.addLayout(left, 1)
+
+        right = QVBoxLayout()
+        right.setSpacing(6)
+        right.addWidget(QLabel("Так меню будет выглядеть в игре", objectName="dim"))
+        self.preview = MenuPreview()
+        right.addWidget(self.preview, 1)
+        hint = QLabel("Название и цвет меняются сразу, статы — с вкладки «3 Статы».", objectName="dim")
+        hint.setWordWrap(True)
+        hint.setMaximumWidth(440)
+        right.addWidget(hint)
+        body.addLayout(right)
+        outer.addLayout(body, 1)
 
     def load(self, title, status, root, launcher_text, installed_text, engine_text, accent=""):
         self.ed_title.setText(title)
@@ -86,6 +147,81 @@ class OverviewTab(QWidget):
         self.info["launcher"].setText(launcher_text)
         self.info["installed"].setText(installed_text)
         self.info["engine"].setText(engine_text)
+        self._preview()
+
+    def set_dashboard(self, st, engine, rows, n_act, n_found, generate=True, engine_key=None):
+        """st — 'ok' | 'stale' | 'none'; rows — статы [(метка, путь, …)]; n_found — None, если не искали."""
+        self._engine = engine
+        self.features.set_engine(engine_key)
+        self._rows = [(str(r[0]), str(r[1]) if len(r) > 1 else "") for r in rows]
+        n_stat = len([1 for _l, p in self._rows if p])
+        word, col = {
+            "ok": ("свежее", TOK["ok"]),
+            "stale": ("устарело", TOK["warn"]),
+            "none": ("нет", TOK["text_hint"]),
+        }[st]
+        self.t_menu.set(word, col)
+        self.t_stats.set(
+            n_stat if n_stat else "авто",
+            None if n_stat else TOK["text_hint"],
+            "статов" if n_stat else "статы найдёт само",
+        )
+        self.t_give.set(n_act, None if n_act else TOK["text_hint"])
+        self.t_found.set("—" if n_found is None else n_found, None if n_found else TOK["text_hint"])
+        if generate:
+            plan = [
+                (
+                    n_found is not None,
+                    "Найти переменные игры (распаковка и подсказки с понятными именами)",
+                    "Открыть шаг 2",
+                    lambda: self._on_goto(1),
+                ),
+                (
+                    n_stat > 0,
+                    "Выбрать статы для меню (необязательно: без них меню найдёт сам)",
+                    "Открыть шаг 3",
+                    lambda: self._on_goto(2),
+                ),
+                (
+                    n_act > 0,
+                    "Добавить выдачу: деньги, предметы (необязательно)",
+                    "Открыть шаг 4",
+                    lambda: self._on_goto(3),
+                ),
+                (st == "ok", "Поставить меню в игру и запустить — в игре Shift+T", "Применить", self._on_apply),
+            ]
+        else:
+            plan = [
+                (st != "none", "Поставить меню в игру", "Применить", self._on_apply),
+                (False, "Запустить игру и нажать Shift+T — значения найдутся сами", "", None),
+                (
+                    n_found is not None,
+                    "Посмотреть, какие данные игры видит меню",
+                    "Открыть шаг 2",
+                    lambda: self._on_goto(1),
+                ),
+                (True, "Статы и выдача для этого движка задаются в самом меню игры", "", None),
+            ]
+        for (mark, text, btn), (done, t, b, fn) in zip(self.steps, plan):
+            mark.setText("✓" if done else "○")
+            mark.setStyleSheet(f"color:{TOK['ok'] if done else TOK['text_hint']}; font-weight:700; font-size:12pt;")
+            text.setText(t)
+            text.setStyleSheet(f"color:{TOK['text_hint'] if done else TOK['text']};")
+            btn.setVisible(bool(b) and not done)
+            btn.setText(b)
+            try:
+                btn.clicked.disconnect()
+            except TypeError:
+                pass
+            if fn:
+                btn.clicked.connect(fn)
+        self._preview()
+
+    def _preview(self):
+        title = self.ed_title.text().strip() or "TEST MENU"
+        if title.upper().startswith("TEST MENU"):
+            title = title[len("TEST MENU") :].lstrip(" |:—-") or "TEST MENU"
+        self.preview.set_data(title, self._engine, self.accent.value() or self._default_accent, self._rows)
 
     def read(self):
         """(title, status, accent) — дефолт заголовка как раньше; пустой цвет = общий."""
@@ -310,11 +446,10 @@ class CandidatesTab(QWidget):
         self.view = QPlainTextEdit()
         self.view.setReadOnly(True)
         self.view.setFont(QFont("Consolas", 10))
-        v.addWidget(self.view)
+        v.addWidget(self.view, 1)
         self.empty = mascot_box("m_wait", "")
         self.empty.hide()
-        v.addWidget(self.empty)
-        v.addStretch(0)
+        v.addWidget(self.empty, 1)
         self.run_buttons = [self.b_col, self.b_cur, self.b_full]
 
     def set_mode(self, renpy, hint=None):

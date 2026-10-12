@@ -85,6 +85,24 @@ class LibraryDialog(QDialog):
         h.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
         self.table.cellDoubleClicked.connect(self._toggle_row)
         v.addWidget(self.table, 1)
+        from tmstudio.theme import ICON_DIR
+        from tmstudio.widgets import EmptyGuide
+
+        # пока папку не просматривали — подсказка вместо пустой таблицы
+        self.guide = EmptyGuide(
+            os.path.join(ICON_DIR, "m_search.png"),
+            "Все игры из одной папки",
+            "Студия найдёт игры на 2 уровня вниз, определит движок и покажет, где меню нет или оно "
+            "устарело. Ставить и обновлять можно пачкой.",
+            [
+                ("Укажи папку", "где лежат игры, например D:/Games — поле сверху или «Выбрать…»"),
+                ("Найти игры", "студия покажет движок, состояние меню и есть ли игра в твоём списке"),
+                ("Отметь и поставь", "«Отметить без меню и устаревшие» → «Поставить / обновить»"),
+            ],
+            buttons=[("Выбрать папку", self._pick)] + ([("Найти игры", self.scan)] if self.folder.text() else []),
+        )
+        v.addWidget(self.guide, 1)
+        self.table.hide()
 
         self.info = QLabel("", objectName="dim")
         self.info.setWordWrap(True)
@@ -160,6 +178,8 @@ class LibraryDialog(QDialog):
         )
 
     def _fill(self):
+        self.guide.hide()
+        self.table.show()
         self.table.setRowCount(len(self.found))
         for r, g in enumerate(self.found):
             chk = QTableWidgetItem()

@@ -17,6 +17,8 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QStyle,
     QStyledItemDelegate,
+    QSizePolicy,
+    QGridLayout,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -517,3 +519,263 @@ class CommandPalette(QDialog):
             fn = self._shown[row][2]
             self.accept()
             fn()
+
+
+# ================================================================ пустые состояния и сводки
+class EmptyGuide(QWidget):
+    """Пустой раздел: маскот, заголовок, пояснение и пронумерованные шаги (+ кнопки)."""
+
+    def __init__(self, mascot_path, title, sub, steps, buttons=()):
+        super().__init__()
+        outer = QVBoxLayout(self)
+        outer.addStretch(1)
+        card = QFrame(objectName="welcome")
+        card.setMaximumWidth(760)
+        v = QVBoxLayout(card)
+        v.setContentsMargins(32, 26, 32, 26)
+        v.setSpacing(10)
+        top = QHBoxLayout()
+        top.setSpacing(18)
+        if mascot_path:
+            from PyQt6.QtGui import QPixmap
+
+            pic = QLabel()
+            pic.setPixmap(QPixmap(mascot_path).scaled(110, 110, Qt.AspectRatioMode.KeepAspectRatio,
+                                                      Qt.TransformationMode.SmoothTransformation))
+            top.addWidget(pic, 0, Qt.AlignmentFlag.AlignTop)
+        tv = QVBoxLayout()
+        tv.setSpacing(4)
+        tv.addWidget(QLabel(title, objectName="h1"))
+        s = QLabel(sub, objectName="dim")
+        s.setWordWrap(True)
+        tv.addWidget(s)
+        tv.addStretch(1)
+        top.addLayout(tv, 1)
+        v.addLayout(top)
+        v.addSpacing(6)
+        row = QHBoxLayout()
+        row.setSpacing(10)
+        for i, (head, text) in enumerate(steps, 1):
+            c = QFrame(objectName="card")
+            cl = QVBoxLayout(c)
+            cl.setContentsMargins(14, 12, 14, 12)
+            cl.setSpacing(3)
+            a = QLabel(f"Шаг {i}")
+            a.setStyleSheet(f"color:{ACCENT}; font-weight:700; font-size:8.5pt;")
+            cl.addWidget(a)
+            cl.addWidget(QLabel(head, objectName="strong"))
+            t = QLabel(text, objectName="dim")
+            t.setWordWrap(True)
+            cl.addWidget(t)
+            cl.addStretch(1)
+            row.addWidget(c, 1)
+        v.addLayout(row)
+        if buttons:
+            v.addSpacing(6)
+            h = QHBoxLayout()
+            h.addStretch(1)
+            for j, (text, fn) in enumerate(buttons):
+                b = QPushButton(text)
+                if j == 0:
+                    b.setObjectName("primary")
+                b.clicked.connect(fn)
+                h.addWidget(b)
+            h.addStretch(1)
+            v.addLayout(h)
+        wrap = QHBoxLayout()
+        wrap.addStretch(1)
+        wrap.addWidget(card, 10)
+        wrap.addStretch(1)
+        outer.addLayout(wrap)
+        outer.addStretch(2)
+
+
+class Tile(QFrame):
+    """Плитка сводки: крупное значение + подпись."""
+
+    def __init__(self, caption):
+        super().__init__(objectName="card")
+        v = QVBoxLayout(self)
+        v.setContentsMargins(14, 10, 14, 10)
+        v.setSpacing(0)
+        self.value = QLabel("—")
+        self.value.setStyleSheet(f"font-size:17pt; font-weight:700; color:{WHITE};")
+        self.sub = QLabel(caption, objectName="dim")
+        v.addWidget(self.value)
+        v.addWidget(self.sub)
+
+    def set(self, value, color=None, sub=None):
+        self.value.setText(str(value))
+        self.value.setStyleSheet(f"font-size:17pt; font-weight:700; color:{color or WHITE};")
+        if sub is not None:
+            self.sub.setText(sub)
+
+
+class MenuPreview(QWidget):
+    """Набросок окна меню в игре: название, цвет, вкладки и первые статы — меняется вживую."""
+
+    def __init__(self):
+        super().__init__()
+        self.setMinimumSize(420, 330)
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
+        self.setFixedWidth(440)
+        self.title, self.engine, self.accent = "", "", ACCENT
+        self.rows = []  # [(метка, путь)] — пустой путь = заголовок группы
+
+    def set_data(self, title, engine, accent, rows):
+        self.title, self.engine = title, engine
+        self.accent = accent if QColor(accent).isValid() else ACCENT
+        self.rows = rows
+        self.update()
+
+    def paintEvent(self, _e):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+        acc = QColor(self.accent)
+        r = QRectF(0.5, 0.5, w - 1, h - 1)
+        p.setPen(QPen(QColor(TOK["line"]), 1))
+        p.setBrush(QColor(TOK["bg_panel"]))
+        p.drawRoundedRect(r, 14, 14)
+        # шапка
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QColor(TOK["bg_card"]))
+        p.drawRoundedRect(QRectF(1, 1, w - 2, 44), 13, 13)
+        p.drawRect(QRectF(1, 30, w - 2, 15))
+        p.setBrush(acc)
+        p.drawRect(QRectF(1, 44, w - 2, 2))
+        f = QFont(self.font())
+        f.setPointSizeF(10.5)
+        f.setWeight(QFont.Weight.Bold)
+        p.setFont(f)
+        p.setPen(QColor(WHITE))
+        fm = QFontMetrics(f)
+        t = fm.elidedText(self.title or "TEST MENU", Qt.TextElideMode.ElideRight, w - 150)
+        p.drawText(QRect(16, 0, w - 150, 46), Qt.AlignmentFlag.AlignVCenter, t)
+        f2 = QFont(self.font())
+        f2.setPointSizeF(8.5)
+        p.setFont(f2)
+        p.setPen(QColor(DIM))
+        p.drawText(QRect(16 + fm.horizontalAdvance(t) + 10, 0, 140, 46), Qt.AlignmentFlag.AlignVCenter, self.engine)
+        for i in range(3):  # значки шапки
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(_qcolor(TOK["tint_2"][:7], int(TOK["tint_2"][7:], 16)))
+            p.drawRoundedRect(QRectF(w - 30 - i * 26, 13, 20, 20), 5, 5)
+        # вкладки
+        x = 14
+        fm2 = QFontMetrics(f2)
+        for i, name in enumerate(("Перемотка", "Значения", "Выдача", "Сюжет", "Тест")):
+            tw = fm2.horizontalAdvance(name)
+            if x + tw > w - 10:
+                break
+            if i == 1:
+                p.setPen(Qt.PenStyle.NoPen)
+                p.setBrush(_qcolor(TOK["tint_2"][:7], int(TOK["tint_2"][7:], 16)))
+                p.drawRoundedRect(QRectF(x - 6, 54, tw + 12, 24), 6, 6)
+                p.setBrush(acc)
+                p.drawRect(QRectF(x - 6, 76, tw + 12, 2))
+            p.setPen(QColor(WHITE if i == 1 else DIM))
+            p.drawText(QRect(x, 54, tw + 2, 24), Qt.AlignmentFlag.AlignVCenter, name)
+            x += tw + 22
+        # строки значений
+        y = 92
+        if not self.rows:
+            p.setPen(QColor(DIM))
+            p.drawText(QRect(16, y, w - 32, 60), Qt.TextFlag.TextWordWrap,
+                       "Статы не заданы: меню само найдёт переменные игры (режим «авто»).")
+        f3 = QFont(self.font())
+        f3.setPointSizeF(9.5)
+        for label, path in self.rows:
+            if y > h - 30:
+                break
+            if not path:
+                p.setFont(f2)
+                p.setPen(acc)
+                p.drawText(QRect(16, y, w - 32, 20), Qt.AlignmentFlag.AlignVCenter, label)
+                y += 22
+                continue
+            p.setFont(f3)
+            p.setPen(QColor(TXT))
+            p.drawText(QRect(16, y, w - 170, 26), Qt.AlignmentFlag.AlignVCenter,
+                       QFontMetrics(f3).elidedText(label, Qt.TextElideMode.ElideRight, w - 180))
+            p.setPen(acc)
+            p.drawText(QRect(w - 160, y, 50, 26), Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight, "—")
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(_qcolor(TOK["tint_2"][:7], int(TOK["tint_2"][7:], 16)))
+            for k in range(2):
+                p.drawRoundedRect(QRectF(w - 98 + k * 30, y + 3, 24, 20), 5, 5)
+            p.setPen(QColor(TXT))
+            p.setFont(f2)
+            p.drawText(QRect(w - 98, y + 3, 24, 20), Qt.AlignmentFlag.AlignCenter, "−")
+            p.drawText(QRect(w - 68, y + 3, 24, 20), Qt.AlignmentFlag.AlignCenter, "+")
+            y += 30
+        p.end()
+
+
+# что умеет меню в игре — по движку: (значок, вкладка, что в ней)
+MENU_FEATURES = {
+    "renpy": [
+        ("rewind", "Перемотка", "откат, слоты, скип"),
+        ("stats", "Значения", "правка, заморозка, HUD"),
+        ("actions", "Выдача", "деньги, предметы, код"),
+        ("story", "Сюжет", "подсказки к выборам"),
+        ("checklist", "Тест", "автопроход, маршруты"),
+        ("settings", "Настройки", "вид, HUD, клавиши, пульт"),
+    ],
+    "web": [
+        ("stats", "Значения", "правка, заморозка, «где»"),
+        ("stopwatch", "Игра", "скорость, пауза, режимы"),
+        ("scanner", "Поиск", "снимок и сужение"),
+        ("save", "Сохранения", "localStorage и IndexedDB"),
+        ("actions", "Выдача", "действия и свой код"),
+        ("remote", "Пульт", "управление из студии"),
+    ],
+    "other": [
+        ("stats", "Значения", "правка и заморозка"),
+        ("stopwatch", "Игра", "скорость и телепорт"),
+        ("scanner", "Поиск", "снимок и сужение"),
+        ("question", "Справка", "клавиши и подсказки"),
+    ],
+}
+
+
+class FeatureCard(QFrame):
+    """Карточка «Что есть в меню игры»: значок, вкладка и что в ней — под движок игры."""
+
+    def __init__(self):
+        super().__init__(objectName="card")
+        v = QVBoxLayout(self)
+        v.setContentsMargins(16, 12, 16, 14)
+        v.setSpacing(8)
+        v.addWidget(QLabel("Что есть в меню игры", objectName="h2"))
+        self.grid = QGridLayout()
+        self.grid.setHorizontalSpacing(18)
+        self.grid.setVerticalSpacing(10)
+        v.addLayout(self.grid)
+        self.key = None
+
+    def set_engine(self, key):
+        k = "renpy" if key in (None, "renpy") else ("web" if key in ("web", "rpgmaker", "twine") else "other")
+        if k == self.key:
+            return
+        self.key = k
+        while self.grid.count():
+            w = self.grid.takeAt(0).widget()
+            if w:
+                w.deleteLater()
+        for i, (ic, name, text) in enumerate(MENU_FEATURES[k]):
+            cell = QWidget(objectName="cell")
+            cell.setStyleSheet("QWidget#cell { background: transparent; }")
+            h = QHBoxLayout(cell)
+            h.setContentsMargins(0, 0, 0, 0)
+            h.setSpacing(10)
+            pic = QLabel()
+            pic.setPixmap(icon(ic).pixmap(30, 30))
+            h.addWidget(pic, 0, Qt.AlignmentFlag.AlignTop)
+            tv = QVBoxLayout()
+            tv.setSpacing(0)
+            tv.addWidget(QLabel(name, objectName="strong"))
+            d = QLabel(text, objectName="dim")
+            tv.addWidget(d)
+            h.addLayout(tv, 1)
+            self.grid.addWidget(cell, i // 2, i % 2)

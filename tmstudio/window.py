@@ -233,6 +233,8 @@ class Studio(QMainWindow):
         self.b_add_game = b_add
         head.addWidget(b_add)
         lv.addLayout(head)
+        self.list_sum = QLabel("", objectName="dim")
+        lv.addWidget(self.list_sum)
         # плашка «меню устарело в N играх» — проверка библиотеки при запуске (_check_library)
         self.update_bar = QFrame(objectName="warnbar")
         ub = QHBoxLayout(self.update_bar)
@@ -332,7 +334,12 @@ class Studio(QMainWindow):
             hdr.addWidget(b, 0, Qt.AlignmentFlag.AlignVCenter)
         v.addLayout(hdr)
 
-        self.overview = OverviewTab(on_dirty=self._mark_dirty, default_accent=self.accent)
+        self.overview = OverviewTab(
+            on_dirty=self._mark_dirty,
+            default_accent=self.accent,
+            on_goto=self._goto_tab,
+            on_apply=self._apply_current,
+        )
         self.stats_tab = TableTab(
             ["Название", "Где лежит (пусто — заголовок группы)", "мин", "макс"],
             "где лежит значение в игре, например mc.money",
@@ -422,6 +429,15 @@ class Studio(QMainWindow):
         self.g_sub.setText(f"{name}, {state}")
         self.b_primary.setText({"none": "Установить меню", "stale": "Обновить меню"}.get(st, "Применить в игре"))
         self.b_primary.setToolTip("Сохранить правки и поставить или обновить меню в игре")
+        if i == self.cur:
+            self.overview.set_dashboard(
+                st, name, self.stats_tab.read(), len([a for a in self.actions_tab.read() if len(a) > 1 and a[1]]),
+                getattr(self, "_cand_count", None), eng is None or eng.supports("generate"),
+                eng.key if eng else None)
+
+    def _goto_tab(self, t):
+        if self.tabs.isTabEnabled(t):
+            self.tabs.setCurrentIndex(t)
 
     # ------------------------------------------------------------ модель/список
     def _reload_list(self):
@@ -458,6 +474,12 @@ class Studio(QMainWindow):
                 self.list.setCurrentItem(it)  # (сигналы заглушены: UI игры уже загружен)
         self.list.blockSignals(False)
         self.right.setCurrentIndex(0 if self.games else 1)
+        n = {"ok": 0, "stale": 0, "none": 0}
+        for row in range(self.list.count()):
+            n[(self.list.item(row).data(GAME_ROLE) or {}).get("status", "none")] += 1
+        parts = [f"свежее {n['ok']}"] + ([f"устарело {n['stale']}"] if n["stale"] else []) + (
+            [f"без меню {n['none']}"] if n["none"] else [])
+        self.list_sum.setText(f"Игр: {self.list.count()}  |  " + ", ".join(parts) if self.games else "")
         self._filter_list(self.list_filter.text())
 
     def _filter_list(self, text):
@@ -911,9 +933,12 @@ class Studio(QMainWindow):
         if self.cur is None:
             return
         p = os.path.join(CAND_DIR, f"game_{self.cur}.txt")
+        self._cand_count = None
         if os.path.exists(p):
             try:
                 text = open(p, encoding="utf-8", errors="replace").read()
+                self._cand_count = sum(1 for ln in text.splitlines()
+                                       if ln.strip() and not ln.lstrip().startswith("#") and ("=" in ln or "->" in ln))
                 try:
                     chars, names = self._naming_ctx(self.cur)
                     text = naming.annotate(text, analysis.parse_candidates, chars, names)
@@ -932,6 +957,8 @@ class Studio(QMainWindow):
                     "Нажми «1. Распаковать игру», затем «2. Найти переменные»."
                 )
             self.cand_tab.set_text(msg, empty=True)
+        if self.cur is not None:
+            self._set_header(self.cur)
 
     def _select_index(self, idx):
         """Выделить в списке игру с данным индексом манифеста."""
