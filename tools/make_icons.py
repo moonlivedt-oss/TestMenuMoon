@@ -74,6 +74,8 @@ ICONS = {
     "stopwatch": ic("Время и конкурсы", "stopwatch"),
     "flag": ic("Время и конкурсы", "finish-flag"),
     "question": ic("Интерфейс - знаки", "question-mark-bubble"),
+    "remote": os.path.join(LIB, "04 Иконки", "Сеть", PAL, "satellite-dish.webp"),
+    "play": os.path.join(LIB, "04 Иконки", "Медиа и плеер", PAL, "play-button.webp"),
 }
 
 MASCOTS = {
@@ -98,6 +100,8 @@ STUDIO_ONLY = {
     "clipboard",
     "brush",
     "stopwatch",
+    "remote",
+    "play",
 }
 # web-меню: значки для кнопок вместо ❄ / ✎ / 📷 (браузеры рисуют их цветными эмодзи)
 WEB = ("snow", "edit", "camera", "swap")

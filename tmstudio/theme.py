@@ -75,7 +75,7 @@ QTabBar::tab {{
     background: transparent; color: {DIM}; padding: 9px 18px; margin-right: 4px;
     border: 1px solid transparent; border-radius: 10px;
 }}
-QTabBar::tab:selected {{ color: {ACCENT_INK}; background: {_GRAD_ACC}; font-weight: 700; }}
+QTabBar::tab:selected {{ color: {WHITE}; background: {ACCENT_SOFT}; border: 1px solid {ACCENT_LINE}; font-weight: 700; }}
 QTabBar::tab:hover:!selected {{ color: {WHITE}; background: {BG2}; }}
 QTabBar::tab:disabled {{ color: {MUTE}; }}
 
@@ -128,6 +128,48 @@ QScrollBar::handle:horizontal {{ background: {LINE2}; border-radius: 5px; min-wi
 QScrollBar::handle:horizontal:hover {{ background: {ACCENT}; }}
 QScrollBar::add-line, QScrollBar::sub-line {{ width: 0; height: 0; }}
 QScrollBar::add-page, QScrollBar::sub-page {{ background: transparent; }}
+
+/* ---- новая компоновка: полоса разделов, карточки, шапка игры, журнал строкой ---- */
+QWidget#rail {{ background: {BG1}; border-right: 1px solid {LINE}; }}
+QToolButton#nav {{
+    background: transparent; border: 0; border-radius: 12px; padding: 7px 2px 6px 2px;
+    color: {DIM}; font-size: 8.5pt; font-weight: 600;
+}}
+QToolButton#nav:hover {{ background: {BG2}; color: {TXT}; }}
+QToolButton#nav:checked {{ background: {ACCENT_SOFT}; color: {WHITE}; }}
+QLabel#h1 {{ font-size: 15pt; font-weight: 700; color: {WHITE}; }}
+QLabel#h2 {{ font-size: 12pt; font-weight: 700; color: {WHITE}; }}
+QLabel#strong {{ font-weight: 700; color: {TXT}; }}
+QListWidget#games {{ background: transparent; border: 0; padding: 0; }}
+QListWidget#games::item {{ padding: 0; margin: 0; border: 0; background: transparent; }}
+QPushButton#iconbtn {{ background: transparent; border: 0; padding: 4px; border-radius: 8px; }}
+QPushButton#iconbtn:hover {{ background: {BG3}; }}
+QToolButton#more {{
+    background: {BG3}; border: 1px solid {LINE2}; border-radius: 10px;
+    padding: 7px 12px; color: {TXT}; font-weight: 800;
+}}
+QToolButton#more:hover {{ border: 1px solid {ACCENT_LINE}; }}
+QToolButton#more::menu-indicator {{ image: none; width: 0; }}
+QMenu {{ background: {BG2}; border: 1px solid {LINE2}; border-radius: 10px; padding: 6px; }}
+QMenu::item {{ padding: 7px 18px 7px 10px; border-radius: 7px; color: {TXT}; }}
+QMenu::item:selected {{ background: {ACCENT_SOFT}; color: {WHITE}; }}
+QMenu::item:disabled {{ color: {MUTE}; }}
+QMenu::separator {{ height: 1px; background: {LINE}; margin: 5px 6px; }}
+QMenu::icon {{ padding-left: 6px; }}
+QFrame#statusbar {{ background: {BG1}; border: 1px solid {LINE}; border-radius: 12px; }}
+QFrame#card {{ background: {BG2}; border: 1px solid {LINE}; border-radius: 12px; }}
+QFrame#welcome {{ background: {BG1}; border: 1px solid {LINE}; border-radius: 16px; }}
+QFrame#warnbar {{ background: rgba(255,180,84,0.10); border: 1px solid rgba(255,180,84,0.5); border-radius: 12px; }}
+QLabel#warnbox {{
+    background: rgba(255,180,84,0.10); color: {WARN}; border: 1px solid rgba(255,180,84,0.4);
+    border-radius: 10px; padding: 8px 10px;
+}}
+QPushButton#chip {{ padding: 4px 10px; border-radius: 9px; font-weight: 600; }}
+QPushButton#chip:checked {{ background: {ACCENT_SOFT}; border: 1px solid {ACCENT_LINE}; color: {WHITE}; }}
+QPushButton#link {{ background: transparent; border: 0; color: {DIM}; font-weight: 500; padding: 4px; }}
+QPushButton#link:hover {{ color: {ACCENT}; background: transparent; border: 0; }}
+QCheckBox {{ color: {DIM}; spacing: 8px; }}
+QDialog {{ background: {BG1}; }}
 
 QToolTip {{
     background: {BG2}; color: {TXT}; border: 1px solid {ACCENT_LINE};

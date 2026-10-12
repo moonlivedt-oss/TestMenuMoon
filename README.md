@@ -236,7 +236,7 @@ python tm.py all N        # всё подряд;  list / doctor / validate / uni
 ```
 tm.py                    CLI: collect / curate / gen / deploy / verify / quick / library / saves …
 studio.py                запуск студии (код — tmstudio/)
-tmstudio/                студия: theme, tabs, window, library, remote, tour, save_editor
+tmstudio/                студия: theme, tokens, widgets, tabs, window, library, remote, tour, save_editor
 tmkit/                   логика без GUI: манифест, реестр движков, генерация, установка, анализ,
                          библиотека игр, мост пульта (bridge); saves/ — форматы сохранений
 engines/

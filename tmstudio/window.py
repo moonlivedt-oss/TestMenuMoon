@@ -4,11 +4,16 @@
 процессом `python tm.py <команда> N` через QProcess — окно не замирает, вывод — в логе.
 """
 
-import os, sys, re, html, traceback
+import hashlib, json, os, sys, re, html, traceback
 
 from PyQt6.QtCore import Qt, QEvent, QProcess, QProcessEnvironment, QSettings, QSize, QThread, QTimer, pyqtSignal
-from PyQt6.QtGui import QColor, QIcon, QPixmap, QKeySequence, QShortcut
+from PyQt6.QtGui import QColor, QIcon, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
+    QDialog,
+    QFrame,
+    QMenu,
+    QStackedWidget,
+    QToolButton,
     QPushButton,
     QApplication,
     QMainWindow,
@@ -20,7 +25,6 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QPlainTextEdit,
     QSplitter,
     QMessageBox,
     QFileDialog,
@@ -40,10 +44,11 @@ from tmkit import naming  # понятные имена переменных (с
 from tmstudio import ROOT, tour
 from tmstudio.tokens import TOK
 from tmstudio.theme import (
-    ACCENT, DIRTY_MARK, ENGINE_BADGE, ICON_DIR, ICON_PATH, QSS,
-    add_shadow, faded_icon, ibtn, icon, mascot_box, short_title,
+    ACCENT, ENGINE_BADGE, ICON_DIR, ICON_PATH, QSS,
+    ibtn, icon, short_title,
 )
 from tmstudio.tabs import OverviewTab, TableTab, CandidatesTab
+from tmstudio.widgets import GAME_ROLE, ApplyPreview, GameDelegate, LogPanel, NavRail, WelcomePage
 
 TM_PY = os.path.join(ROOT, "tm.py")
 
@@ -99,6 +104,8 @@ class Studio(QMainWindow):
         QTimer.singleShot(1500, self._check_library)
 
     def start_tour(self):
+        self.show_page(0)
+
         def done():
             self.settings.setValue("tour_done", True)
 
@@ -113,139 +120,215 @@ class Studio(QMainWindow):
         self.setWindowTitle("Test Menu Studio")
 
     # ------------------------------------------------------------ вёрстка
+    # Разделы (полоса слева): 0 Игры, 1 Библиотека, 2 Пульт, 3 Сохранения.
+    # Вкладки игры — шаги: 0 Основное, 1 Найти переменные, 2 Статы, 3 Выдача.
+    TAB_MAIN, TAB_FIND, TAB_STATS, TAB_GIVE = range(4)
+
     def _build_ui(self):
-        root = QSplitter(Qt.Orientation.Vertical)
+        wrap = QWidget()
+        outer = QHBoxLayout(wrap)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+        self.rail = NavRail(
+            [
+                ("Игры", "house", "Мои игры и настройка меню"),
+                ("Библиотека", "load", "Все игры в папке: поставить или обновить меню пачкой"),
+                ("Пульт", "remote", "Управлять запущенной игрой из студии (в меню игры включи «Пульт в студии»)"),
+                ("Сейвы", "save", "Редактор сохранений выбранной игры"),
+            ],
+            bottom=[("Тур", "question", "Пошаговый тур по студии", self.start_tour)],
+        )
+        self.b_tour = self.rail.extra[0]
+        self.rail.changed.connect(self.show_page)
+        outer.addWidget(self.rail)
 
-        top = QSplitter(Qt.Orientation.Horizontal)
+        body = QWidget()
+        bl = QVBoxLayout(body)
+        bl.setContentsMargins(14, 12, 14, 10)
+        bl.setSpacing(0)
+        self.pages = QStackedWidget()
+        self.pages.addWidget(self._build_games_page())
+        self.pages.addWidget(self._page_shell("Библиотека", "Укажи папку с играми: студия найдёт игры, покажет "
+                                              "движок и состояние меню и поставит или обновит меню пачкой."))
+        self.pages.addWidget(self._page_shell("Пульт", "Значения, заморозки, темп и шаг кадра запущенной игры. "
+                                              "В меню игры включи «Пульт в студии»."))
+        self.pages.addWidget(self._page_shell("Сохранения", "Сейвы выбранной игры: Ren'Py, RPG Maker, Unity "
+                                              "(PlayerPrefs, JSON), Godot. Снимки и сравнение."))
+        bl.addWidget(self.pages, 1)
+        self.logp = LogPanel(self._stop_proc)
+        self.log = self.logp.log
+        self.b_stop = self.logp.b_stop
+        bl.addWidget(self.logp)
+        outer.addWidget(body, 1)
+        self.setCentralWidget(wrap)
 
-        # ---- левая колонка: игры + глобальные действия ----
+    def _page_shell(self, title, sub):
+        """Страница раздела: заголовок + пояснение; содержимое создаётся при первом показе."""
+        w = QWidget()
+        v = QVBoxLayout(w)
+        v.setContentsMargins(4, 2, 4, 8)
+        v.setSpacing(4)
+        v.addWidget(QLabel(title, objectName="h1"))
+        s = QLabel(sub, objectName="dim")
+        s.setWordWrap(True)
+        v.addWidget(s)
+        v.addSpacing(8)
+        w.body = v
+        w.content = None
+        return w
+
+    def show_page(self, i):
+        """Показать раздел; Библиотека, Пульт и Сохранения собираются при первом показе."""
+        self.rail.select(i)
+        page = self.pages.widget(i)
+        if i == 1:
+            if page.content is None:
+                from tmstudio.library import LibraryDialog
+
+                page.content = LibraryDialog(page, self.games, self._add_to_manifest, self._library_changed)
+                page.content.setWindowFlags(Qt.WindowType.Widget)
+                page.body.addWidget(page.content, 1)
+            page.content.games = self.games  # после перечитывания списка — новый словарь
+        elif i == 2 and page.content is None:
+            from tmstudio.remote import RemoteDialog
+
+            page.content = RemoteDialog(page)
+            page.content.setWindowFlags(Qt.WindowType.Widget)
+            page.body.addWidget(page.content, 1)
+        elif i == 3:
+            from tmstudio import save_editor
+
+            if page.content is None:
+                page.content = save_editor.SaveEditor(page)
+                page.content.setWindowFlags(Qt.WindowType.Widget)
+                page.body.addWidget(page.content, 1)
+                page.content._root = None
+            root = self.games[self.cur].get("root", "") if self.cur is not None else ""
+            if root and root != page.content._root:
+                eng = engines.detect_engine(root)
+                page.content._root = root
+                page.content._load_game(root, eng.key if eng else None)
+        self.pages.setCurrentIndex(i)
+        if getattr(page, "content", None) is not None:
+            page.content.show()
+
+    def _build_games_page(self):
+        split = QSplitter(Qt.Orientation.Horizontal)
+
+        # ---- левая колонка: мои игры ----
         left = QWidget()
         lv = QVBoxLayout(left)
-        lv.setContentsMargins(0, 0, 0, 0)
+        lv.setContentsMargins(0, 2, 6, 0)
         lv.setSpacing(8)
         head = QHBoxLayout()
-        head.setSpacing(11)
-        if os.path.exists(ICON_PATH):
-            ic = QLabel()
-            ic.setPixmap(
-                QPixmap(ICON_PATH).scaled(
-                    44,
-                    44,
-                    Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation,
-                )
-            )
-            add_shadow(ic, blur=18, dy=4, alpha=170)
-            head.addWidget(ic)
-        tv = QVBoxLayout()
-        tv.setSpacing(0)
-        title = QLabel("Test Menu Studio")
-        title.setObjectName("h1")
-        tv.addWidget(title)
-        head.addLayout(tv)
+        head.addWidget(QLabel("Мои игры", objectName="h1"))
         head.addStretch(1)
-        self.b_tour = ibtn("Тур", "question", "Пошаговый тур по студии")
-        self.b_tour.clicked.connect(self.start_tour)
-        head.addWidget(self.b_tour, 0, Qt.AlignmentFlag.AlignTop)
+        b_add = ibtn("", "plus", "Добавить игру в список (выбрать папку игры)", px=22)
+        b_add.setObjectName("iconbtn")
+        b_add.clicked.connect(self._add_game)
+        self.b_add_game = b_add
+        head.addWidget(b_add)
         lv.addLayout(head)
         # плашка «меню устарело в N играх» — проверка библиотеки при запуске (_check_library)
-        self.update_bar = QWidget(objectName="updatebar")
-        self.update_bar.setStyleSheet(
-            "#updatebar { background: rgba(240,180,41,0.12); border: 1px solid rgba(240,180,41,0.55);"
-            " border-radius: 12px; }"
-        )
+        self.update_bar = QFrame(objectName="warnbar")
         ub = QHBoxLayout(self.update_bar)
         ub.setContentsMargins(10, 6, 6, 6)
         self.update_lbl = QLabel("")
         self.update_lbl.setWordWrap(True)
         ub.addWidget(self.update_lbl, 1)
         self.b_update = QPushButton("Обновить")
-        self.b_update.setObjectName("primary")
         self.b_update.clicked.connect(self._update_stale)
-        b_hide = ibtn("", "close", "Скрыть до следующего запуска")
+        b_hide = ibtn("", "close", "Скрыть до следующего запуска", px=16)
+        b_hide.setObjectName("iconbtn")
         b_hide.clicked.connect(self.update_bar.hide)
         ub.addWidget(self.b_update)
         ub.addWidget(b_hide)
         self.update_bar.hide()
         lv.addWidget(self.update_bar)
-        lv.addWidget(QLabel("МОИ ИГРЫ", objectName="section"))
         self.list_filter = QLineEdit()
         self.list_filter.setPlaceholderText("Поиск игры")
         self.list_filter.setClearButtonEnabled(True)
         self.list_filter.textChanged.connect(self._filter_list)
         lv.addWidget(self.list_filter)
-        self.list = QListWidget()
+        self.list = QListWidget(objectName="games")
+        self.list.setItemDelegate(GameDelegate(self.list))
+        self.list.setMouseTracking(True)
+        self.list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.list.currentRowChanged.connect(self._on_select)
         lv.addWidget(self.list, 1)
-        self.list_empty = mascot_box(
-            "m_wave", "Игр пока нет. «Добавить» — выбрать папку игры, или «Быстрая установка» ниже."
-        )
-        self.list_empty.hide()
-        lv.addWidget(self.list_empty)
-
-        mb = QHBoxLayout()
-        b_add = ibtn("Добавить", "plus", "Добавить игру в список (выбрать папку игры)")
-        self.b_add_game = b_add
-        b_add.clicked.connect(self._add_game)
-        b_rem = ibtn("Убрать", "trash", "Убрать выбранную игру из списка (файлы игры не трогаются)")
-        b_rem.setObjectName("danger")
-        b_rem.clicked.connect(self._remove_game)
-        mb.addWidget(b_add)
-        mb.addWidget(b_rem)
-        mb.addStretch(1)
-        lv.addLayout(mb)
-
-        b_quick = ibtn("Быстрая установка…", "download")
-        self.b_quick = b_quick
-        b_quick.setToolTip(
-            "Поставить меню в любую игру Ren'Py без настройки и без добавления в список.\n"
+        self.b_quick = ibtn("Быстрая установка…", "download")
+        self.b_quick.setToolTip(
+            "Поставить меню в любую игру без добавления в список.\n"
             "Статы меню найдёт само (режим «авто»), подсказки к выборам и сканер тоже работают."
         )
-        b_quick.clicked.connect(self._quick_install)
-        lv.addWidget(b_quick)
-        b_lib = ibtn(
-            "Библиотека игр…",
-            "house",
-            "Указать папку с играми: студия найдёт все игры, покажет движок и состояние меню, "
-            "поставит или обновит меню пачкой",
-        )
-        b_lib.clicked.connect(self._open_library)
-        lv.addWidget(b_lib)
-        b_remote = ibtn(
-            "Пульт…",
-            "rocket",
-            "Управлять запущенной игрой из студии: значения, заморозки, темп, шаг кадра "
-            "(в меню игры включи «Пульт в студии»)",
-        )
-        b_remote.clicked.connect(self._open_remote)
-        lv.addWidget(b_remote)
-        b_saves = ibtn("Сохранения…", "save", "Редактор сохранений выбранной игры: Ren'Py, RPG Maker, Unity (PlayerPrefs, JSON), Godot")
-        b_saves.clicked.connect(self._open_saves)
-        lv.addWidget(b_saves)
-
+        self.b_quick.clicked.connect(self._quick_install)
+        lv.addWidget(self.b_quick)
         gb = QHBoxLayout()
-        self.b_all_dep = ibtn("Применить во всех", "upload", "Сохранить правки и поставить или обновить меню во всех играх списка")
-        self.b_all_dep.setObjectName("primary")
+        self.b_all_dep = ibtn("Применить во всех", "upload",
+                              "Сохранить правки и поставить или обновить меню во всех играх списка")
         self.b_all_dep.clicked.connect(self._deploy_all)
         self.b_all_ver = ibtn("Проверить всё", "checklist", "Проверка (lint) всех игр Ren'Py из списка")
         self.b_all_ver.clicked.connect(lambda: self._enqueue("verify"))
-        gb.addWidget(self.b_all_dep)
-        gb.addWidget(self.b_all_ver)
+        gb.addWidget(self.b_all_dep, 1)
+        gb.addWidget(self.b_all_ver, 1)
         lv.addLayout(gb)
-        top.addWidget(left)
+        split.addWidget(left)
 
-        # ---- правая колонка: вкладки ----
-        self.overview = OverviewTab(
-            on_dirty=self._mark_dirty,
-            on_save=self._save_manifest,
-            on_save_deploy=self._save_and_deploy,
-            on_validate=self._validate_current,
-            on_verify=lambda: self._enqueue_current("verify"),
-            on_open=self._open_folder,
-            on_uninstall=self._uninstall,
-            on_launch=self._launch_current,
-            default_accent=self.accent,
+        # ---- правая часть: игра или приветствие ----
+        self.right = QStackedWidget()
+        self.welcome = WelcomePage(
+            ICON_PATH if os.path.exists(ICON_PATH) else None,
+            on_folder=self._welcome_folder,
+            on_add=self._add_game,
+            on_quick=self._quick_install,
+            on_tour=self.start_tour,
         )
+        self.right.addWidget(self._build_game_panel())
+        self.right.addWidget(self.welcome)
+        split.addWidget(self.right)
+        split.setStretchFactor(0, 0)
+        split.setStretchFactor(1, 1)
+        split.setSizes([320, 880])
+        return split
+
+    def _build_game_panel(self):
+        panel = QWidget()
+        v = QVBoxLayout(panel)
+        v.setContentsMargins(8, 2, 0, 0)
+        v.setSpacing(10)
+        # шапка игры: название, состояние, одна главная кнопка + «…»
+        hdr = QHBoxLayout()
+        hdr.setSpacing(8)
+        tv = QVBoxLayout()
+        tv.setSpacing(0)
+        self.g_title = QLabel("", objectName="h1")
+        self.g_sub = QLabel("", objectName="dim")
+        tv.addWidget(self.g_title)
+        tv.addWidget(self.g_sub)
+        hdr.addLayout(tv, 1)
+        self.b_run = ibtn("Запустить", "play", "Запустить игру, чтобы посмотреть меню")
+        self.b_run.clicked.connect(self._launch_current)
+        self.b_primary = ibtn("Применить в игре", "upload")
+        self.b_primary.setObjectName("primary")
+        self.b_primary.clicked.connect(self._apply_current)
+        self.b_more = QToolButton(objectName="more")
+        self.b_more.setText("•••")
+        self.b_more.setToolTip("Ещё действия")
+        self.b_more.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        m = QMenu(self.b_more)
+        self.act_check = m.addAction(icon("checklist"), "Проверить", self._check_current)
+        m.addAction(icon("load"), "Открыть папку игры", self._open_folder)
+        m.addAction(icon("save"), "Сохранения игры", lambda: self.show_page(3))
+        m.addAction("Сохранить без установки  (Ctrl+S)", self._save_manifest)
+        m.addSeparator()
+        self.act_uninstall = m.addAction(icon("trash"), "Удалить меню из игры", self._uninstall)
+        m.addAction("Убрать из списка студии", self._remove_game)
+        self.b_more.setMenu(m)
+        for b in (self.b_run, self.b_primary, self.b_more):
+            hdr.addWidget(b, 0, Qt.AlignmentFlag.AlignVCenter)
+        v.addLayout(hdr)
+
+        self.overview = OverviewTab(on_dirty=self._mark_dirty, default_accent=self.accent)
         self.stats_tab = TableTab(
             ["Название", "Где лежит (пусто — заголовок группы)", "мин", "макс"],
             "где лежит значение в игре, например mc.money",
@@ -265,50 +348,35 @@ class Studio(QMainWindow):
             on_full=self._full_pipeline,
             on_add_stats=self._add_stats_from_candidates,
         )
-
         self.tabs = QTabWidget()
-        self.tabs.setIconSize(QSize(20, 20))
-        self.tabs.addTab(self.overview, icon("house"), "Основное")
-        self.tabs.addTab(self.stats_tab, icon("stats"), "Статы")
-        self.tabs.addTab(self.actions_tab, icon("actions"), "Выдача")
-        self.tabs.addTab(self.cand_tab, icon("scanner"), "Поиск переменных")
-        top.addWidget(self.tabs)
-        top.setStretchFactor(0, 0)
-        top.setStretchFactor(1, 1)
-        top.setSizes([330, 850])
-        root.addWidget(top)
+        self.tabs.setIconSize(QSize(18, 18))
+        self.tabs.addTab(self.overview, icon("house"), "1  Основное")
+        self.tabs.addTab(self.cand_tab, icon("scanner"), "2  Найти переменные")
+        self.tabs.addTab(self.stats_tab, icon("stats"), "3  Статы")
+        self.tabs.addTab(self.actions_tab, icon("actions"), "4  Выдача")
+        v.addWidget(self.tabs, 1)
+        return panel
 
-        # ---- лог ----
-        logw = QWidget()
-        lgl = QVBoxLayout(logw)
-        lgl.setContentsMargins(0, 6, 0, 0)
-        lh = QHBoxLayout()
-        lh.addWidget(QLabel("ЖУРНАЛ", objectName="section"))
-        lh.addStretch(1)
-        self.b_stop = ibtn("Стоп", "close", px=16)
-        self.b_stop.setObjectName("danger")
-        self.b_stop.setToolTip("Прервать текущую команду и очистить очередь")
-        self.b_stop.setEnabled(False)
-        self.b_stop.clicked.connect(self._stop_proc)
-        b_clr = ibtn("Очистить", "brush", px=16)
-        b_clr.clicked.connect(lambda: self.log.clear())
-        lh.addWidget(self.b_stop)
-        lh.addWidget(b_clr)
-        lgl.addLayout(lh)
-        self.log = QPlainTextEdit()
-        self.log.setObjectName("log")
-        self.log.setReadOnly(True)
-        lgl.addWidget(self.log)
-        root.addWidget(logw)
-        root.setStretchFactor(0, 3)
-        root.setStretchFactor(1, 1)
-        root.setSizes([560, 200])
+    def _welcome_folder(self):
+        self.show_page(1)
+        page = self.pages.widget(1)
+        if page.content is not None:
+            page.content._pick()
 
-        wrap = QWidget()
-        wl = QVBoxLayout(wrap)
-        wl.setContentsMargins(12, 12, 12, 12)
-        wl.addWidget(root)
-        self.setCentralWidget(wrap)
+    def _set_header(self, i):
+        """Шапка игры: название, движок и состояние; текст главной кнопки — по ситуации."""
+        g = self.games[i]
+        eng = self.cur_engine
+        st = self._status(i, eng)
+        name = ENGINE_BADGE.get(eng.key, eng.title) if eng else "движок не распознан"
+        state = {"ok": "меню стоит, версия свежая", "stale": "меню устарело",
+                 "none": "меню не установлено"}[st]
+        if i in self._dirty_ids:
+            state += ", есть несохранённые правки"
+        self.g_title.setText(short_title(g.get("title", "")))
+        self.g_sub.setText(f"{name}, {state}")
+        self.b_primary.setText({"none": "Установить меню", "stale": "Обновить меню"}.get(st, "Применить в игре"))
+        self.b_primary.setToolTip("Сохранить правки и поставить или обновить меню в игре")
 
     # ------------------------------------------------------------ модель/список
     def _reload_list(self):
@@ -319,35 +387,32 @@ class Studio(QMainWindow):
             root = g.get("root", "")
             eng = engines.detect_engine(root)
             st = self._status(i, eng)
-            installed = st != "none"
             n_stat = len([s for s in g.get("stats", []) if s[1]])
             n_act = len([a for a in g.get("actions", []) if a[1]])
-            bits = [ENGINE_BADGE.get(eng.key, eng.key) if eng else "движок не распознан"]
+            counts = []
             if n_stat:
-                bits.append(f"статы: {n_stat}")
+                counts.append(f"статы: {n_stat}")
             if n_act:
-                bits.append(f"выдача: {n_act}")
-            mark = DIRTY_MARK if i in self._dirty_ids else ""
-            # две строки: название (без «TEST MENU |») и движок со счётчиками
-            it = QListWidgetItem(f"{short_title(g.get('title', ''))}\n{', '.join(bits)}{mark}")
-            it.setIcon(
-                icon("ok") if st == "ok" else icon("warn") if st == "stale" else faded_icon("ok")
-            )
+                counts.append(f"выдача: {n_act}")
+            title = short_title(g.get("title", ""))
+            ename = ENGINE_BADGE.get(eng.key, eng.title) if eng else "движок не распознан"
+            it = QListWidgetItem(f"{title} {ename}")  # текст — для поиска, рисует GameDelegate
+            it.setData(GAME_ROLE, {
+                "title": title, "engine": eng.key if eng else None, "engine_name": ename,
+                "counts": ", ".join(counts), "status": st, "dirty": i in self._dirty_ids,
+            })
             it.setToolTip(
                 f"game_{i}  {root}\n"
                 + {"ok": "Меню стоит, версия свежая",
-                   "stale": "Меню устарело — «Применить в игре»",
+                   "stale": "Меню устарело — «Обновить меню»",
                    "none": "Меню не установлено"}[st]
             )
             it.setData(Qt.ItemDataRole.UserRole, i)
-            it.setForeground(QColor(TOK["text"] if installed else TOK["text_hint"]))
             self.list.addItem(it)
             if i == self.cur:  # clear() сбрасывает выделение — вернуть
-                self.list.setCurrentItem(
-                    it
-                )  # (сигналы заглушены: UI игры уже загружен)
+                self.list.setCurrentItem(it)  # (сигналы заглушены: UI игры уже загружен)
         self.list.blockSignals(False)
-        self.list_empty.setVisible(not self.games)
+        self.right.setCurrentIndex(0 if self.games else 1)
         self._filter_list(self.list_filter.text())
 
     def _filter_list(self, text):
@@ -391,7 +456,11 @@ class Studio(QMainWindow):
         )
         self._apply_engine_tabs(eng)
         renpy_mode = eng is None or eng.key == "renpy"
-        self.overview.set_renpy(renpy_mode)
+        self.act_check.setToolTip(
+            "Проверить данные меню и прогнать проверку самой игры (lint Ren'Py)"
+            if renpy_mode else "Проверить данные меню: код выдачи, повторы, группы"
+        )
+        self._set_header(i)
         self.cand_tab.set_mode(
             renpy_mode,
             None
@@ -403,15 +472,14 @@ class Studio(QMainWindow):
         self._load_cand()
 
     def _apply_engine_tabs(self, eng):
-        """Включить только вкладки, релевантные движку (None -> Ren'Py-манифест, всё вкл).
-        Индексы вкладок: 0 Обзор, 1 Характеристики, 2 Действия, 3 Кандидаты."""
+        """Включить только вкладки, релевантные движку (None -> Ren'Py-манифест, всё вкл)."""
         gen = eng.supports("generate") if eng else True  # статы/действия из манифеста
         scan = eng.supports("scan") if eng else True  # поиск кандидатов
-        self.tabs.setTabEnabled(1, gen)
-        self.tabs.setTabEnabled(2, gen)
-        self.tabs.setTabEnabled(3, scan)
+        self.tabs.setTabEnabled(self.TAB_STATS, gen)
+        self.tabs.setTabEnabled(self.TAB_GIVE, gen)
+        self.tabs.setTabEnabled(self.TAB_FIND, scan)
         if not self.tabs.isTabEnabled(self.tabs.currentIndex()):
-            self.tabs.setCurrentIndex(0)
+            self.tabs.setCurrentIndex(self.TAB_MAIN)
 
     def _flush_ui_to_model(self):
         if self.cur is None:
@@ -452,8 +520,8 @@ class Studio(QMainWindow):
     def _status_text(self, i):
         return {
             "ok": "стоит, свежая версия",
-            "stale": "устарело — нажми «Применить в игре»",
-            "none": "не стоит — нажми «Применить в игре»",
+            "stale": "устарело — нажми «Обновить меню»",
+            "none": "не стоит — нажми «Установить меню»",
         }[self._status(i)]
 
     def _installed_with(self, eng, root):
@@ -475,6 +543,7 @@ class Studio(QMainWindow):
         self._reload_list()
         if i == self.cur:
             self.overview.set_installed(self._status_text(i))
+            self._set_header(i)
 
     # ------------------------------------------------------------ действия
     def _mark_dirty(self, *_):
@@ -487,9 +556,12 @@ class Studio(QMainWindow):
         for row in range(self.list.count()):
             it = self.list.item(row)
             if it.data(Qt.ItemDataRole.UserRole) == self.cur:
-                if not it.text().endswith(DIRTY_MARK):
-                    it.setText(it.text() + DIRTY_MARK)
+                d = dict(it.data(GAME_ROLE) or {})
+                if not d.get("dirty"):
+                    d["dirty"] = True
+                    it.setData(GAME_ROLE, d)
                 break
+        self._set_header(self.cur)
 
     def _save_manifest(self):
         self._flush_ui_to_model()
@@ -500,6 +572,7 @@ class Studio(QMainWindow):
         self._reload_list()
         if self.cur is not None:
             self.overview.set_installed(self._status_text(self.cur))
+            self._set_header(self.cur)
 
     def _save_and_deploy(self):
         if self.cur is None:
@@ -513,6 +586,74 @@ class Studio(QMainWindow):
         else:
             self._enqueue("gen", str(self.cur))
             self._enqueue("deploy", str(self.cur))
+
+    # ---- «Применить в игре»: сначала показать, что изменится ----
+    def _applied_key(self, root):
+        return "applied/" + hashlib.md5(os.path.normcase(os.path.abspath(root)).encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _apply_snapshot(g):
+        """То, что меню получит из студии: названия статов и выдачи, название и цвет."""
+        def rows(key):
+            return {r[0]: str(r[1]) for r in g.get(key, []) if len(r) > 1 and r[1]}
+        return {"stats": rows("stats"), "actions": rows("actions"),
+                "title": g.get("title", ""), "accent": g.get("accent", "")}
+
+    def _apply_plan(self, i):
+        g = self.games[i]
+        eng = self.cur_engine
+        st = self._status(i, eng)
+        lines = []
+        if st == "none":
+            lines.append(("+", "Меню будет установлено в игру", ""))
+        elif st == "stale":
+            lines.append(("~", "Меню обновится до текущей версии", ""))
+        if eng is None or eng.supports("generate"):
+            cur = self._apply_snapshot(g)
+            raw = self.settings.value(self._applied_key(g.get("root", "")), "")
+            prev = json.loads(raw) if raw else None
+            if prev is None:
+                if st == "none" and (cur["stats"] or cur["actions"]):
+                    lines.append(("+", f"Статов: {len(cur['stats'])}, выдачи: {len(cur['actions'])}", ""))
+            else:
+                for key, word in (("stats", "Стат"), ("actions", "Выдача")):
+                    a, b = prev.get(key, {}), cur[key]
+                    for k, val in b.items():
+                        if k not in a:
+                            lines.append(("+", f"{word} «{k}»", val[:40]))
+                        elif a[k] != val:
+                            lines.append(("~", f"{word} «{k}»", val[:40]))
+                    lines += [("-", f"{word} «{k}»", "") for k in a if k not in b]
+                if prev.get("title") != cur["title"]:
+                    lines.append(("~", "Название в меню", short_title(cur["title"])))
+                if prev.get("accent", "") != cur["accent"]:
+                    lines.append(("~", "Цвет меню", cur["accent"] or "как у всех игр"))
+        return lines
+
+    def _apply_current(self):
+        if self.cur is None:
+            return
+        self._flush_ui_to_model()
+        i = self.cur
+        lines = self._apply_plan(i)
+        if lines and self.settings.value("confirm_apply", True, type=bool):
+            dlg = ApplyPreview(self, f"Применить в «{short_title(self.games[i].get('title', ''))}»", lines)
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                return
+            if dlg.ask.isChecked():
+                self.settings.setValue("confirm_apply", False)
+        for sign, text, detail in lines:
+            self._log_line(f"  {sign} {text}" + (f"  ({detail})" if detail else ""))
+        self._save_and_deploy()
+        g = self.games[i]
+        self.settings.setValue(self._applied_key(g.get("root", "")),
+                               json.dumps(self._apply_snapshot(g), ensure_ascii=False))
+
+    def _check_current(self):
+        """Одна проверка: данные меню без запуска игры, у Ren'Py ещё и lint самой игры."""
+        self._validate_current()
+        if self.cur_engine is None or self.cur_engine.key == "renpy":
+            self._enqueue_current("verify")
 
     def _deploy_all(self):
         if self._dirty:
@@ -788,7 +929,7 @@ class Studio(QMainWindow):
         if not stale:
             self.update_bar.hide()
             return
-        names = ", ".join(g.name for g in stale[:3]) + (" …" if len(stale) > 3 else "")
+        names = ", ".join(short_title(g.name) for g in stale[:3]) + (" …" if len(stale) > 3 else "")
         self.update_lbl.setText(f"Меню устарело в играх: {len(stale)} ({names})")
         self.update_bar.show()
 
@@ -815,22 +956,16 @@ class Studio(QMainWindow):
         self._log_line(f"$ обновлено меню: {ok}" + (f", ошибок: {len(errors)}" if errors else ""))
 
     def _open_remote(self):
-        from tmstudio.remote import RemoteDialog
-
-        if getattr(self, "_remote", None) is None:
-            self._remote = RemoteDialog(self)
-        self._remote.show()
-        self._remote.raise_()
+        self.show_page(2)
 
     def _open_library(self):
-        from tmstudio.library import LibraryDialog
-
-        LibraryDialog(self, self.games, self._add_to_manifest, self._library_changed).exec()
+        self.show_page(1)
 
     def _library_changed(self):
         self._reload_list()
         if self.cur is not None:
             self.overview.set_installed(self._status_text(self.cur))
+            self._set_header(self.cur)
 
     def _add_game(self):
         d = QFileDialog.getExistingDirectory(
@@ -877,11 +1012,7 @@ class Studio(QMainWindow):
         self._select_index(idx)
 
     def _open_saves(self):
-        from tmstudio import save_editor
-
-        root = self.games[self.cur].get("root", "") if self.cur is not None else ""
-        eng = engines.detect_engine(root) if root else None
-        save_editor.SaveEditor(self, game_root=root or None, engine_key=eng.key if eng else None).exec()
+        self.show_page(3)
 
     def _quick_install(self):
         d = QFileDialog.getExistingDirectory(
@@ -1015,9 +1146,10 @@ class Studio(QMainWindow):
 
     def _set_busy(self, busy):
         self.b_stop.setEnabled(busy)
-        for b in (self.b_all_dep, self.b_all_ver):
+        for b in (self.b_all_dep, self.b_all_ver, self.b_primary):
             b.setEnabled(not busy)
-        self.overview.set_busy(busy)
+        self.act_check.setEnabled(not busy)
+        self.act_uninstall.setEnabled(not busy)
         self.cand_tab.set_busy(busy)
 
     def _run_next(self):
@@ -1065,6 +1197,7 @@ class Studio(QMainWindow):
         self._reload_list()
         if self.cur is not None:
             self.overview.set_installed(self._status_text(self.cur))
+            self._set_header(self.cur)
             self._load_cand()
         if self.queue:
             self._run_next()
@@ -1094,8 +1227,10 @@ class Studio(QMainWindow):
         return TOK["text_dim"]
 
     def _append_colored(self, t):
+        col = self._line_color(t)
         esc = html.escape(t).replace(" ", "&nbsp;")
-        self._append_html(f"<span style='color:{self._line_color(t)}'>{esc}</span>")
+        self._append_html(f"<span style='color:{col}'>{esc}</span>")
+        self.logp.show_line(t.lstrip("$! "), col)
 
     def _log_line(self, text):
         self._append_colored(text.rstrip("\n"))

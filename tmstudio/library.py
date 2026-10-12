@@ -25,10 +25,11 @@ from PyQt6.QtWidgets import (
 
 from tmkit import library
 from tmstudio.theme import DIM, ENGINE_BADGE, GOOD, MUTE, WARN, ibtn
+from tmstudio.tokens import ENGINE
 
-STATUS_TEXT = {"ok": "актуальное", "stale": "устарело", "none": "нет", "?": "не понять"}
+STATUS_TEXT = {"ok": "свежее", "stale": "устарело", "none": "нет", "?": "не понять"}
 STATUS_COLOR = {"ok": GOOD, "stale": WARN, "none": MUTE, "?": DIM}
-COLS = ("", "Игра", "Движок", "Меню", "В студии", "Папка")
+COLS = ("", "Игра", "Движок", "Меню", "В моих играх", "Папка")
 
 
 class LibraryDialog(QDialog):
@@ -57,6 +58,22 @@ class LibraryDialog(QDialog):
         top.addWidget(b_scan)
         v.addLayout(top)
 
+        # фильтр: все / где нужно обновить / где меню нет
+        seg = QHBoxLayout()
+        seg.setSpacing(6)
+        self.seg = {}
+        for key, text in (("all", "Все"), ("stale", "Нужно обновить"), ("none", "Без меню")):
+            b = QPushButton(text)
+            b.setObjectName("chip")
+            b.setCheckable(True)
+            b.setChecked(key == "all")
+            b.clicked.connect(lambda _=False, k=key: self._set_view(k))
+            seg.addWidget(b)
+            self.seg[key] = b
+        seg.addStretch(1)
+        v.addLayout(seg)
+        self.view = "all"
+
         self.table = QTableWidget(0, len(COLS))
         self.table.setHorizontalHeaderLabels(COLS)
         self.table.verticalHeader().setVisible(False)
@@ -76,13 +93,13 @@ class LibraryDialog(QDialog):
         bar = QHBoxLayout()
         for text, icon, tip, fn in (
             (
-                "Все",
+                "Отметить все",
                 "checklist",
                 "Отметить все игры",
                 lambda: self._mark(lambda g: True),
             ),
             (
-                "Без меню и устаревшие",
+                "Отметить без меню и устаревшие",
                 "warn",
                 "Отметить, где меню нет или оно старое",
                 lambda: self._mark(lambda g: g.status in ("none", "stale")),
@@ -104,7 +121,7 @@ class LibraryDialog(QDialog):
         b_rem.setObjectName("danger")
         b_rem.clicked.connect(lambda: self._apply(library.remove, "снятие"))
         b_add = ibtn(
-            "В студию", "plus", "Добавить отмеченные игры в список студии (манифест)"
+            "В мои игры", "plus", "Добавить отмеченные игры в список студии"
         )
         b_add.clicked.connect(self._add_to_studio)
         for b in (b_inst, b_rem, b_add):
@@ -133,6 +150,10 @@ class LibraryDialog(QDialog):
             QApplication.restoreOverrideCursor()
         self._fill()
         n = {s: sum(1 for g in self.found if g.status == s) for s in STATUS_TEXT}
+        self.seg["all"].setText(f"Все  {len(self.found)}")
+        self.seg["stale"].setText(f"Нужно обновить  {n['stale']}")
+        self.seg["none"].setText(f"Без меню  {n['none']}")
+        self._set_view(self.view)
         self.info.setText(
             f"Найдено игр: {len(self.found)}. Меню актуальное: {n['ok']}, устарело: {n['stale']}, "
             f"нет: {n['none']}. Двойной щелчок по строке — отметить."
@@ -147,18 +168,29 @@ class LibraryDialog(QDialog):
             self.table.setItem(r, 0, chk)
             self._row(r, g)
 
+    def _set_view(self, key):
+        self.view = key
+        for k, b in self.seg.items():
+            b.setChecked(k == key)
+        for r, g in enumerate(self.found):
+            self.table.setRowHidden(r, key != "all" and g.status != key)
+
     def _row(self, r, g):
         cells = (
             g.name,
             ENGINE_BADGE.get(g.engine.key, g.engine.title),
             STATUS_TEXT.get(g.status, g.status),
-            f"game_{g.index}" if g.index is not None else "",
+            "да" if g.index is not None else "",
             g.folder,
         )
         for c, text in enumerate(cells, start=1):
             it = QTableWidgetItem(text)
+            if c == 2 and g.engine.key in ENGINE:
+                it.setForeground(QColor(ENGINE[g.engine.key][1]))
             if c == 3:
                 it.setForeground(QColor(STATUS_COLOR.get(g.status, DIM)))
+            if c == 5:
+                it.setForeground(QColor(DIM))
             self.table.setItem(r, c, it)
 
     def _toggle_row(self, r, _c):

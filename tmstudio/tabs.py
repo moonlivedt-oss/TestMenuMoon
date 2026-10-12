@@ -26,166 +26,83 @@ from tmkit import manifest  # чтение/запись games_data.py
 from tmkit import analysis  # разбор строк кандидатов -> пары для таблицы статов
 
 from tmstudio.theme import ACCENT, hline, ibtn, mascot_box
+from tmstudio.widgets import AccentPicker
 
 
-# ============================================================ вкладка: Обзор
+# ============================================================ вкладка: Основное
 class OverviewTab(QWidget):
-    """Заголовок/статус/пути игры + кнопки действий над ней."""
+    """Название, заметка, цвет меню и сведения об игре. Кнопки действий — в шапке игры (окно)."""
 
-    def __init__(
-        self,
-        on_dirty,
-        on_save,
-        on_save_deploy,
-        on_validate,
-        on_verify,
-        on_open,
-        on_uninstall,
-        on_launch,
-        default_accent=ACCENT,
-    ):
+    def __init__(self, on_dirty, default_accent=ACCENT):
         super().__init__()
         self._default_accent = default_accent
         self._on_dirty = on_dirty
         g = QGridLayout(self)
-        g.setContentsMargins(16, 16, 16, 16)
-        g.setVerticalSpacing(10)
+        g.setContentsMargins(20, 18, 20, 18)
+        g.setHorizontalSpacing(16)
+        g.setVerticalSpacing(12)
         r = 0
-        g.addWidget(QLabel("Название в меню"), r, 0)
+        g.addWidget(QLabel("Название в меню", objectName="dim"), r, 0)
         self.ed_title = QLineEdit()
+        self.ed_title.setPlaceholderText("как будет подписано окно меню в игре")
         self.ed_title.textEdited.connect(on_dirty)
         g.addWidget(self.ed_title, r, 1)
         r += 1
-        g.addWidget(QLabel("Заметка"), r, 0)
+        g.addWidget(QLabel("Заметка", objectName="dim"), r, 0)
         self.ed_status = QLineEdit()
+        self.ed_status.setPlaceholderText("для себя: что проверено, что сломано")
         self.ed_status.textEdited.connect(on_dirty)
         g.addWidget(self.ed_status, r, 1)
         r += 1
-        g.addWidget(QLabel("Цвет меню"), r, 0)
-        arow = QHBoxLayout()
-        self.ed_accent = QLineEdit()
-        self.ed_accent.setPlaceholderText(f"как у всех игр ({default_accent})")
-        self.ed_accent.textEdited.connect(on_dirty)
-        self.ed_accent.textEdited.connect(lambda: self._update_swatch())
-        self.sw_accent = QPushButton()
-        self.sw_accent.setFixedSize(22, 22)
-        self.sw_accent.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.sw_accent.setToolTip("Выбрать цвет меню")
-        self.sw_accent.clicked.connect(self._pick_color)
-        arow.addWidget(self.ed_accent, 1)
-        arow.addWidget(self.sw_accent)
-        g.addLayout(arow, r, 1)
-        r += 1
-        g.addWidget(QLabel("Папка игры"), r, 0)
-        self.lb_root = QLabel("—", objectName="dim")
-        self.lb_root.setWordWrap(True)
-        g.addWidget(self.lb_root, r, 1)
-        r += 1
-        g.addWidget(QLabel("Запуск"), r, 0)
-        self.lb_launcher = QLabel("—", objectName="dim")
-        self.lb_launcher.setWordWrap(True)
-        g.addWidget(self.lb_launcher, r, 1)
-        r += 1
-        g.addWidget(QLabel("Меню в игре"), r, 0)
-        self.lb_installed = QLabel("—", objectName="accent")
-        g.addWidget(self.lb_installed, r, 1)
-        r += 1
-        g.addWidget(QLabel("Движок"), r, 0)
-        self.lb_engine = QLabel("—", objectName="dim")
-        g.addWidget(self.lb_engine, r, 1)
+        g.addWidget(QLabel("Цвет меню", objectName="dim"), r, 0)
+        self.accent = AccentPicker(default_accent, self._pick_color)
+        self.accent.changed.connect(on_dirty)
+        g.addWidget(self.accent, r, 1)
         r += 1
         g.addWidget(hline(), r, 0, 1, 2)
         r += 1
-
-        row = QHBoxLayout()
-        # одна главная кнопка; «Сохранить» без установки — Ctrl+S (окно), отдельной кнопки нет
-        b_save = ibtn("Применить в игре", "upload", "Сохранить правки и поставить или обновить меню в игре")
-        b_save.setObjectName("primary")
-        self.b_save_deploy = b_save
-        b_save.clicked.connect(on_save_deploy)
-        b_run = ibtn("Запустить", "rocket", "Запустить игру, чтобы посмотреть меню")
-        self.b_run = b_run
-        b_run.clicked.connect(on_launch)
-        # одна проверка: данные меню без запуска игры, у Ren'Py ещё и lint самой игры
-        self._on_validate, self._on_verify = on_validate, on_verify
-        b_chk = ibtn("Проверить", "checklist")
-        b_chk.clicked.connect(self._check)
-        self.b_chk = b_chk
-        self._renpy = True
-        b_open = ibtn("Открыть папку", "load", "Открыть папку игры в проводнике")
-        b_open.clicked.connect(on_open)
-        b_uni = ibtn("Удалить меню", "trash", "Убрать меню из игры (файлы самой игры не трогаются)")
-        b_uni.setObjectName("danger")
-        b_uni.clicked.connect(on_uninstall)
-        for b in (b_save, b_run, b_chk, b_open):
-            row.addWidget(b)
-        row.addStretch(1)
-        row.addWidget(b_uni)
-        g.addLayout(row, r, 0, 1, 2)
-        r += 1
+        self.info = {}
+        for key, label in (
+            ("installed", "Меню в игре"),
+            ("engine", "Движок"),
+            ("root", "Папка игры"),
+            ("launcher", "Запуск"),
+        ):
+            g.addWidget(QLabel(label, objectName="dim"), r, 0)
+            lb = QLabel("—", objectName="accent" if key == "installed" else "")
+            lb.setWordWrap(True)
+            lb.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            g.addWidget(lb, r, 1)
+            self.info[key] = lb
+            r += 1
+        g.setColumnStretch(1, 1)
         g.setRowStretch(r, 1)
-        self.run_buttons = [b_save, b_chk, b_uni]
-        self.set_renpy(True)
 
-    def _check(self):
-        self._on_validate()
-        if self._renpy:
-            self._on_verify()
-
-    def set_busy(self, busy):
-        self._busy = busy
-        for b in self.run_buttons:
-            b.setEnabled(not busy)
-
-    def set_renpy(self, renpy):
-        """Lint — только для Ren'Py: у Twine/RPG Maker verify падал с ошибкой."""
-        self._renpy = renpy
-        self.b_chk.setToolTip(
-            "Проверить данные меню и прогнать проверку самой игры (lint Ren'Py)"
-            if renpy
-            else "Проверить данные меню: код выдачи, повторы, группы"
-        )
-
-    def load(
-        self, title, status, root, launcher_text, installed_text, engine_text, accent=""
-    ):
+    def load(self, title, status, root, launcher_text, installed_text, engine_text, accent=""):
         self.ed_title.setText(title)
         self.ed_status.setText(status)
-        self.ed_accent.setText(accent)
-        self._update_swatch()
-        self.lb_root.setText(root)
-        self.lb_launcher.setText(launcher_text)
-        self.lb_installed.setText(installed_text)
-        self.lb_engine.setText(engine_text)
+        self.accent.set_value(accent)
+        self.info["root"].setText(root)
+        self.info["launcher"].setText(launcher_text)
+        self.info["installed"].setText(installed_text)
+        self.info["engine"].setText(engine_text)
 
     def read(self):
-        """(title, status, accent) — дефолт заголовка как раньше; пустой акцент = наследовать."""
+        """(title, status, accent) — дефолт заголовка как раньше; пустой цвет = общий."""
         return (
             self.ed_title.text().strip() or "TEST MENU",
             self.ed_status.text().strip(),
-            self.ed_accent.text().strip(),
-        )
-
-    def _update_swatch(self):
-        col = self.ed_accent.text().strip() or self._default_accent
-        if not QColor(col).isValid():
-            col = "transparent"
-        self.sw_accent.setStyleSheet(
-            f"background:{col}; border:1px solid #23262f; border-radius:5px;"
+            self.accent.value(),
         )
 
     def _pick_color(self):
-        cur = self.ed_accent.text().strip() or self._default_accent
-        col = QColorDialog.getColor(QColor(cur), self, "Акцент игры")
+        cur = self.accent.value() or self._default_accent
+        col = QColorDialog.getColor(QColor(cur), self, "Цвет меню")
         if col.isValid():
-            self.ed_accent.setText(col.name())  # #rrggbb
-            self._update_swatch()
-            self._on_dirty()
+            self.accent.set_value(col.name(), user=True)  # #rrggbb
 
     def set_installed(self, text):
-        self.lb_installed.setText(text)
-
-
+        self.info["installed"].setText(text)
 # ================================================ вкладка: таблица (статы/действия)
 class TableTab(QWidget):
     """Редактор пар «метка / значение» (одинаков для Статов и Выдачи)."""

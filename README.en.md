@@ -246,7 +246,7 @@ Work area paths can be overridden with `TM_BUILD`, `TM_ANA_BASE`, `TM_CAND_DIR`.
 ```
 tm.py                    CLI: collect / curate / gen / deploy / verify / quick / library / saves …
 studio.py                starts the studio (code in tmstudio/)
-tmstudio/                the studio: theme, tabs, window, library, remote, tour, save_editor
+tmstudio/                the studio: theme, tokens, widgets, tabs, window, library, remote, tour, save_editor
 tmkit/                   logic without GUI: manifest, engine registry, generation, install, analysis,
                          game library, remote bridge; saves/ holds save formats
 engines/
