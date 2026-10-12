@@ -48,7 +48,7 @@ from tmstudio.theme import (
     ibtn, icon, short_title,
 )
 from tmstudio.tabs import OverviewTab, TableTab, CandidatesTab
-from tmstudio.widgets import GAME_ROLE, ApplyPreview, GameDelegate, LogPanel, NavRail, WelcomePage
+from tmstudio.widgets import GAME_ROLE, ApplyPreview, CommandPalette, GameDelegate, LogPanel, NavRail, WelcomePage
 
 TM_PY = os.path.join(ROOT, "tm.py")
 
@@ -95,6 +95,7 @@ class Studio(QMainWindow):
         # список игр правят и руками (games_data.py): F5 — перечитать, а при возврате в окно
         # студия сама замечает изменения на диске (отдельной кнопки больше нет)
         QShortcut(QKeySequence("F5"), self).activated.connect(self._reload_from_disk)
+        QShortcut(QKeySequence("Ctrl+K"), self).activated.connect(self._open_palette)
         self._manifest_mtime = self._manifest_mtime_now()
         self._reload_list()
         if self.games:
@@ -136,9 +137,12 @@ class Studio(QMainWindow):
                 ("Пульт", "remote", "Управлять запущенной игрой из студии (в меню игры включи «Пульт в студии»)"),
                 ("Сейвы", "save", "Редактор сохранений выбранной игры"),
             ],
-            bottom=[("Тур", "question", "Пошаговый тур по студии", self.start_tour)],
+            bottom=[
+                ("Найти", "scanner", "Найти игру, раздел или действие (Ctrl+K)", self._open_palette),
+                ("Тур", "question", "Пошаговый тур по студии", self.start_tour),
+            ],
         )
-        self.b_tour = self.rail.extra[0]
+        self.b_tour = self.rail.extra[1]
         self.rail.changed.connect(self.show_page)
         outer.addWidget(self.rail)
 
@@ -356,6 +360,47 @@ class Studio(QMainWindow):
         self.tabs.addTab(self.actions_tab, icon("actions"), "4  Выдача")
         v.addWidget(self.tabs, 1)
         return panel
+
+    # ---- Ctrl+K: всё, что умеет студия, одним списком ----
+    def _palette_items(self):
+        def game(i):
+            def go():
+                self.show_page(0)
+                self._select_index(i)
+            return go
+
+        def tab(t):
+            def go():
+                self.show_page(0)
+                if self.tabs.isTabEnabled(t):
+                    self.tabs.setCurrentIndex(t)
+            return go
+
+        items = [(short_title(g.get("title", "")), "игра", game(i)) for i, g in sorted(self.games.items())]
+        items += [("Мои игры", "раздел", lambda: self.show_page(0)),
+                  ("Библиотека", "раздел", lambda: self.show_page(1)),
+                  ("Пульт", "раздел", lambda: self.show_page(2)),
+                  ("Сохранения игры", "раздел", lambda: self.show_page(3))]
+        if self.cur is not None:
+            items += [(self.tabs.tabText(t).split("  ", 1)[-1], "вкладка игры", tab(t))
+                      for t in range(self.tabs.count()) if self.tabs.isTabEnabled(t)]
+            items += [(self.b_primary.text(), "игра", self._apply_current),
+                      ("Запустить игру", "игра", self._launch_current),
+                      ("Проверить", "игра", self._check_current),
+                      ("Открыть папку игры", "игра", self._open_folder),
+                      ("Сохранить без установки", "Ctrl+S", self._save_manifest),
+                      ("Удалить меню из игры", "игра", self._uninstall)]
+        items += [("Добавить игру", "список", self._add_game),
+                  ("Быстрая установка", "любая игра", self._quick_install),
+                  ("Применить во всех", "список", self._deploy_all),
+                  ("Проверить всё", "список", lambda: self._enqueue("verify")),
+                  ("Перечитать список игр", "F5", self._reload_from_disk),
+                  ("Журнал", "показать или скрыть", lambda: self.logp.set_open(not self.logp.log.isVisible())),
+                  ("Тур по студии", "помощь", self.start_tour)]
+        return items
+
+    def _open_palette(self):
+        CommandPalette(self, self._palette_items()).exec()
 
     def _welcome_folder(self):
         self.show_page(1)

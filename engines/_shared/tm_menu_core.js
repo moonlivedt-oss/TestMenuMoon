@@ -269,7 +269,7 @@
       "#tm-ov{position:fixed;inset:0;z-index:2147483000;background:radial-gradient(1200px 820px at 50% 28%,rgba(8,12,20,.7),rgba(4,6,11,.84));",
       "backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);display:flex;align-items:center;",
       "justify-content:center;animation:tmFade .16s ease;font-family:'Segoe UI',system-ui,-apple-system,sans-serif}",
-      "#tm-win{width:min(720px,94vw);max-height:84vh;display:flex;flex-direction:column;",
+      "#tm-win{position:relative;width:min(720px,94vw);max-height:84vh;display:flex;flex-direction:column;",
       "background:" + K.bg_panel + "fa;border:1px solid " + K.line + ";border-radius:16px;overflow:hidden;",
       "color:" + K.text + ";box-shadow:0 32px 90px -20px rgba(0,0,0,.7);",
       "animation:tmPop .2s cubic-bezier(.2,.7,.3,1)}",
@@ -335,7 +335,13 @@
       "#tm-speed{position:fixed;right:12px;top:10px;z-index:2147482999;background:" + ACCENT + ";color:" + K.on_accent + ";font:800 13px 'Segoe UI',sans-serif;",
       "padding:4px 10px;border-radius:9px;pointer-events:none;box-shadow:0 6px 18px -6px #000a}",
       "#tm-body::-webkit-scrollbar{width:11px}#tm-body::-webkit-scrollbar-thumb{background:" + K.line + ";border-radius:6px;border:3px solid transparent;background-clip:padding-box}",
-      "#tm-body::-webkit-scrollbar-thumb:hover{background:" + ACCENT + ";background-clip:padding-box}"
+      "#tm-body::-webkit-scrollbar-thumb:hover{background:" + ACCENT + ";background-clip:padding-box}",
+      ".tm-pal{position:absolute;left:50%;top:64px;transform:translateX(-50%);width:min(520px,92%);z-index:5;",
+      "background:" + K.bg_popup + ";border:1px solid " + K.line + ";border-radius:12px;padding:10px;box-shadow:0 24px 60px -16px rgba(0,0,0,.8)}",
+      ".tm-pal-list{max-height:340px;overflow:auto;margin-top:8px}",
+      ".tm-pal-row{display:flex;justify-content:space-between;gap:12px;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px}",
+      ".tm-pal-row.on,.tm-pal-row:hover{background:" + ACCENT + "24}",
+      ".tm-pal-row .h{color:" + K.text_hint + ";font-size:11.5px;white-space:nowrap}"
     ].join("");
     document.head.appendChild(s);
   }
@@ -914,9 +920,89 @@
     });
   }
 
+
+  // ------------------------------------------------------------------ Ctrl+K: поиск по всем функциям
+  // Вкладки, значения (переход к строке через фильтр), выдача, режимы «Игры» — одним списком.
+  var pal = null;  // { el, inp, list, items, shown, sel }
+  function setTab(k) {
+    tab = k; saveState();
+    var tb = winEl && winEl.querySelector("#tm-tabs");
+    if (tb) Array.prototype.forEach.call(tb.children, function (o) { o.className = o.getAttribute("data-tab") === k ? "on" : ""; });
+    rerender();
+  }
+  function tabList() {
+    var all = [["vals", T("Значения")], ["game", T("Игра")], ["scan", T("Поиск")], ["saves", T("Сохранения")], ["act", T("Выдача")]];
+    return all.filter(function (d) {
+      if (d[0] === "game" && !hasGameTab()) return false;
+      return !(simple && (d[0] === "scan" || d[0] === "saves"));
+    });
+  }
+  function palItems() {
+    var out = tabList().map(function (d) { return { l: d[1], h: T("вкладка"), run: function () { setTab(d[0]); } }; });
+    if (A.ready()) {
+      (A.stats() || []).forEach(function (sec) {
+        (sec.rows || []).forEach(function (r) {
+          out.push({ l: String(r.name), h: sec.title || T("значение"), run: function () { filter = String(r.name).toLowerCase(); setTab("vals"); } });
+        });
+      });
+      (A.actions() || []).forEach(function (a) {
+        out.push({ l: a.label, h: T("Выдача"), run: function () {
+          try { a.run(); toast(T("Готово")); } catch (e) { toast(T("Ошибка"), true); console.error("[TM]", e); }
+        } });
+      });
+      (A.cheats ? A.cheats() || [] : []).forEach(function (c) {
+        out.push({ l: c.label, h: T("Игра"), run: function () {
+          try { c.set(!c.get()); toast(c.label + ": " + (c.get() ? T("вкл") : T("выкл"))); rerender(); } catch (e) { console.error("[TM]", e); }
+        } });
+      });
+    }
+    out.push({ l: simple ? T("Простой режим: выключить") : T("Простой режим: включить"), h: T("меню"), run: toggleSimple });
+    return out;
+  }
+  function palDraw() {
+    var q = pal.inp.value.trim().toLowerCase();
+    pal.shown = pal.items.filter(function (it) { return !q || (it.l + " " + it.h).toLowerCase().indexOf(q) >= 0; }).slice(0, 40);
+    pal.sel = Math.min(pal.sel, Math.max(0, pal.shown.length - 1));
+    pal.list.innerHTML = "";
+    if (!pal.shown.length) pal.list.appendChild(el("div", "tm-msg", T("Ничего не найдено.")));
+    pal.shown.forEach(function (it, i) {
+      var row = el("div", "tm-pal-row" + (i === pal.sel ? " on" : ""));
+      row.appendChild(el("span", "l", it.l));
+      row.appendChild(el("span", "h", it.h));
+      row.addEventListener("click", function () { palPick(i); });
+      pal.list.appendChild(row);
+    });
+  }
+  function palPick(i) { var it = pal && pal.shown[i]; closePalette(); if (it) it.run(); }
+  function openPalette() {
+    if (!winEl || pal) return;
+    var box = el("div", "tm-pal");
+    var inp = el("input", "tm-finput");
+    inp.type = "text"; inp.placeholder = T("Найти функцию, значение или выдачу");
+    var list = el("div", "tm-pal-list");
+    box.appendChild(inp); box.appendChild(list);
+    pal = { el: box, inp: inp, list: list, items: palItems(), shown: [], sel: 0 };
+    inp.addEventListener("input", function () { pal.sel = 0; palDraw(); });
+    winEl.appendChild(box);
+    palDraw(); inp.focus();
+  }
+  function closePalette() { if (pal) { pal.el.remove(); pal = null; } }
+
+  // простой режим: без вкладок «Поиск» и «Сохранения» (запоминается в браузере)
+  var simple = false;
+  try { simple = localStorage.getItem("tm_simple") === "1"; } catch (e) {}
+  function toggleSimple() {
+    simple = !simple;
+    try { localStorage.setItem("tm_simple", simple ? "1" : "0"); } catch (e) {}
+    if (simple && (tab === "scan" || tab === "saves")) tab = "vals";
+    close(); open();
+    toast(simple ? T("Простой режим: без «Поиска» и «Сохранений»") : T("Полный режим"));
+  }
+
   // ------------------------------------------------------------------ окно
   function close() {
     if (!overlay) return;
+    closePalette();
     overlay.remove(); overlay = null; winEl = bodyEl = null;
     if (A.onClose) { try { A.onClose(); } catch (e) { console.error("[TM]", e); } }
   }
@@ -937,14 +1023,16 @@
 
     var head = el("div"); head.id = "tm-head";
     var t = el("div", "t"); t.innerHTML = "TEST MENU<small>" + T(A.title || "") + "</small>"; head.appendChild(t);
+    mkBtn(head, T("Найти  Ctrl+K"), openPalette).title = T("Поиск по всем функциям меню");
     mkBtn(head, "X", close).title = T("Закрыть");
     winEl.appendChild(head);
     enableDrag(head);
 
     var tabs = el("div"); tabs.id = "tm-tabs";
-    [["vals", T("Значения")], ["game", T("Игра")], ["scan", T("Поиск")], ["saves", T("Сохранения")], ["act", T("Выдача")]].forEach(function (d) {
-      if (d[0] === "game" && !hasGameTab()) return;
-      var b = mkBtn(tabs, d[1], function () { tab = d[0]; Array.prototype.forEach.call(tabs.children, function (o) { o.className = ""; }); b.className = "on"; saveState(); rerender(); });
+    if (simple && (tab === "scan" || tab === "saves")) tab = "vals";
+    tabList().forEach(function (d) {
+      var b = mkBtn(tabs, d[1], function () { setTab(d[0]); });
+      b.setAttribute("data-tab", d[0]);
       if (d[0] === tab) b.className = "on";
     });
     winEl.appendChild(tabs);
@@ -963,7 +1051,7 @@
 
     var foot = el("div"); foot.id = "tm-foot";
     foot.innerHTML = A.ready()
-      ? T("<kbd>Shift</kbd>+<kbd>T</kbd> меню | <kbd>Esc</kbd> закрыть | тяни за шапку")
+      ? T("<kbd>Shift</kbd>+<kbd>T</kbd> меню | <kbd>Ctrl</kbd>+<kbd>K</kbd> поиск | <kbd>Esc</kbd> закрыть")
       : (A.footMissing || T("Данные игры недоступны."));
     winEl.appendChild(foot);
 
@@ -987,7 +1075,14 @@
     var hot = e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey && (e.code === "KeyT" || e.key === "T" || e.key === "t");
     if (hot && !isTyping(e)) { e.preventDefault(); e.stopPropagation(); toggle(); return; }
     if (!overlay) return;
-    if (e.key === "Escape") { e.preventDefault(); close(); }
+    if (e.ctrlKey && !e.altKey && (e.code === "KeyK" || e.key === "k" || e.key === "K")) {
+      e.preventDefault(); e.stopPropagation(); if (pal) closePalette(); else openPalette(); return;
+    }
+    // поле палитры: стрелки и Enter ловим здесь (до самого поля событие не доходит)
+    if (pal && e.key === "ArrowDown") { e.preventDefault(); pal.sel = Math.min(pal.sel + 1, pal.shown.length - 1); palDraw(); }
+    else if (pal && e.key === "ArrowUp") { e.preventDefault(); pal.sel = Math.max(pal.sel - 1, 0); palDraw(); }
+    else if (pal && e.key === "Enter") { e.preventDefault(); palPick(pal.sel); }
+    else if (e.key === "Escape") { e.preventDefault(); if (pal) closePalette(); else close(); }
     e.stopPropagation();
   }, true);
   ["keyup", "keypress"].forEach(function (n) {

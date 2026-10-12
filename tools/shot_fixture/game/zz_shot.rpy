@@ -2,7 +2,7 @@ init 1000 python:
     import os, traceback
     ZZ_OUT = os.environ.get("ZZ_OUT", "shots")
     zz_steps = ["dbg", "rewind", "stats", "stats_row", "scan", "story", "test", "test_cov", "test_scenes",
-                "settings", "settings_keys", "settings_tools", "diag", "help", "quit"]
+                "settings", "settings_keys", "settings_tools", "pal", "diag", "help", "quit"]
     # шаг -> (вкладка, поля tm_ui): раскрытая строка, «Найти переменную», разделы «Теста» и «Настроек»
     ZZ_SET = {
         "stats": ("stats", {"vals_mode": "stats", "row_open": "", "vals_tools": False}),
@@ -14,6 +14,7 @@ init 1000 python:
         "settings": ("settings", {"set_sec": "look"}),
         "settings_keys": ("settings", {"set_sec": "keys"}),
         "settings_tools": ("settings", {"set_sec": "tools"}),
+        "pal": ("stats", {"pal_open": True, "pal_text": u"mon"}),
     }
     zz_i = [0]
 
@@ -63,6 +64,7 @@ init 1000 python:
             if zz_i[0] < len(zz_steps) - 1:
                 nxt = zz_steps[zz_i[0]]
                 if nxt == "diag":
+                    tm_ui.pal_open = False
                     tm_ui.diag_open = True
                 elif nxt == "help":
                     tm_ui.diag_open = False

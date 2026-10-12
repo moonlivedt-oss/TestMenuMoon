@@ -458,3 +458,62 @@ class AccentPicker(QWidget):
         custom = bool(cur) and cur not in [c.lower() for _n, c in ACCENT_PRESETS]
         self.b_custom.setText(f"свой: {self._value}" if custom else "свой…")
         self.b_custom.setStyleSheet(f"QPushButton#chip {{ border:1px solid {self._value}; }}" if custom else "")
+
+
+# ================================================================ Ctrl+K
+class CommandPalette(QDialog):
+    """Поиск по всем действиям студии: items — [(подпись, раздел, функция)].
+    Стрелки — выбор, Enter — выполнить, Esc — закрыть."""
+
+    def __init__(self, parent, items):
+        super().__init__(parent)
+        self.setWindowTitle("Найти действие")
+        self.setMinimumWidth(560)
+        self.items = items
+        v = QVBoxLayout(self)
+        v.setContentsMargins(14, 14, 14, 12)
+        v.setSpacing(8)
+        from PyQt6.QtWidgets import QLineEdit, QListWidget
+
+        self.ed = QLineEdit()
+        self.ed.setPlaceholderText("Игра, раздел, вкладка или действие")
+        self.ed.textChanged.connect(self._fill)
+        self.ed.installEventFilter(self)
+        v.addWidget(self.ed)
+        self.lst = QListWidget()
+        self.lst.setMinimumHeight(320)
+        self.lst.itemActivated.connect(lambda _it: self._run())
+        v.addWidget(self.lst)
+        v.addWidget(QLabel("Enter — выполнить, стрелки — выбор, Esc — закрыть", objectName="dim"))
+        self._shown = []
+        self._fill("")
+
+    def _fill(self, q):
+        q = q.strip().lower()
+        self._shown = [it for it in self.items if not q or q in (it[0] + " " + it[1]).lower()][:60]
+        self.lst.clear()
+        for label, sec, _fn in self._shown:
+            self.lst.addItem(f"{label}    —  {sec}")
+        if self._shown:
+            self.lst.setCurrentRow(0)
+
+    def eventFilter(self, obj, e):
+        from PyQt6.QtCore import QEvent
+
+        if obj is self.ed and e.type() == QEvent.Type.KeyPress:
+            k = e.key()
+            if k in (Qt.Key.Key_Down, Qt.Key.Key_Up):
+                row = self.lst.currentRow() + (1 if k == Qt.Key.Key_Down else -1)
+                self.lst.setCurrentRow(max(0, min(row, self.lst.count() - 1)))
+                return True
+            if k in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+                self._run()
+                return True
+        return super().eventFilter(obj, e)
+
+    def _run(self):
+        row = self.lst.currentRow()
+        if 0 <= row < len(self._shown):
+            fn = self._shown[row][2]
+            self.accept()
+            fn()

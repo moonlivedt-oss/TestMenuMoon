@@ -15,6 +15,7 @@ screen tm_menu():
     key "game_menu" action SetField(tm_ui, "open", False)
     key "ctrl_K_z" action Function(tm_undo)
     key "K_F1" action SetField(tm_ui, "help_open", True)
+    key "ctrl_K_k" action Function(tm_pal_open)
     if tm_ui.tab == "stats":
         key "K_PAGEUP" action Function(tm_stat_page, -1)
         key "K_PAGEDOWN" action Function(tm_stat_page, 1)
@@ -72,12 +73,21 @@ screen tm_menu():
                                             yalign 0.5
                                             use tm_icon("logo", 34)
                                             # tm_q: «{» в заголовке игры иначе ломал текст-теги
-                                            text tm_q(tm_title) style "tm_head_title" yalign 0.5
+                                            text tm_q(_tm_short(tm_head_name(), 30)) style "tm_head_title" yalign 0.5
                                             text tm_engine_tag() style "tm_head_btn_text" color TM_TOK["text_hint"] bold False yalign 0.5
                                         hbox:
                                             spacing 8
                                             xalign 1.0
                                             yalign 0.5
+                                            button:
+                                                style "tm_head_btn"
+                                                padding (8, 3)
+                                                tooltip "Поиск по всем функциям меню: вкладки, значения, выдача, команды"
+                                                action Function(tm_pal_open)
+                                                hbox:
+                                                    spacing 4
+                                                    use tm_icon("scanner", 22)
+                                                    text "Ctrl+K" style "tm_head_btn_text" size 15 yalign 0.5
                                             button:
                                                 style "tm_head_btn"
                                                 padding (6, 3)
@@ -162,11 +172,13 @@ screen tm_menu():
                                 if _tip:
                                     text tm_q(_tip) style "tm_tip"
                                 else:
-                                    text (tm_keys_text() + tm_tr(u"  меню    Esc  закрыть    F1  все клавиши")) style "tm_foot"
+                                    text (tm_keys_text() + tm_tr(u"  меню    Ctrl+K  поиск    Esc  закрыть    F1  все клавиши")) style "tm_foot"
 
     # ---------- попапы ----------
     if tm_ui.edit:
         use tm_edit_popup
+    elif tm_ui.pal_open:
+        use tm_pal_popup
     elif tm_ui.where_open:
         use tm_where_popup
     elif getattr(tm_ui, "log_open", False):

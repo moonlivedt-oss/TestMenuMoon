@@ -360,6 +360,19 @@ screen tm_tab_settings():
                     text "Вид" style "tm_h"
                     hbox:
                         spacing 12
+                        text "Режим меню" style "tm_label" yalign 0.5 min_width 200
+                        textbutton "Полный":
+                            style "tm_btn" text_style "tm_btn_text"
+                            selected not tm_simple()
+                            tooltip "Все вкладки и инструменты"
+                            action Function(tm_set_simple, False)
+                        textbutton "Простой":
+                            style "tm_btn" text_style "tm_btn_text"
+                            selected tm_simple()
+                            tooltip "Без вкладок «Тест» и «Код» и без инструментов списка значений — меньше кнопок"
+                            action Function(tm_set_simple, True)
+                    hbox:
+                        spacing 12
                         text "Язык меню" style "tm_label" yalign 0.5 min_width 200
                         textbutton "Русский":
                             style "tm_btn" text_style "tm_btn_text"

@@ -87,6 +87,8 @@ python tm.py library "C:/Games" --install         # install where missing or out
 
 On first start the studio shows a tour (repeat it with the "Тур" button). In the game, the
 question mark button in the menu header (or F1) opens "How to use the menu" with all keys.
+**Ctrl+K** searches everything, both in the studio and in the in-game menu (tabs, values, give
+actions, commands).
 
 Mod loaders for Unity, Unreal and GameMaker are downloaded once: `python tools/fetch_unity_tools.py`
 (BepInEx 5/6, UnityExplorer, UE4SS, UndertaleModTool CLI, AssetRipper, Cpp2IL into `tools/unity/`,
@@ -104,23 +106,25 @@ there (edit, freeze, speed, frame step) while the menu doesn't cover the game. T
 - **Rewind**: history rollback (×1/×10, mouse wheel), 3 quick slots, instant skip (unread text
   too), auto-forward, text speed; before any jump the menu saves a "Before jump" slot by itself;
   a log of recent lines with rollback to any of them.
-- **Variables**: edit stats (−/+ with a step, input, `+50`, `*2`, `=-5`), toggles, freezing
-  (`=`, `≥`, `≤`), favorites, a HUD over the game, "changed since last time" marks, undo (Ctrl+Z).
+- **Values**: edit stats (−/+ with a step, click the number to enter `+50`, `*2`, `=-5`), toggles;
+  the rarer things sit behind "•••" in a row: freezing (`=`, `≥`, `≤`), favorites, a HUD over the
+  game, the script threshold. "Changed since last time" marks, undo (Ctrl+Z).
   Sources: **data** (a list from the manifest) and **auto**: the menu finds game variables, class
   objects, dicts and lists by itself. Readable names: `alice_love` → "Alice | Love" (character
   name + word dictionary + labels from dialogue); the grey line shows where the value changes and
   which thresholds the script checks. **Change log**: what the game, the menu, a freeze or the
   remote changed, when and at which label (the full log goes into the tester report).
+  The **Find a variable** mode there works like ArtMoney, but by names: snapshot → changes → narrowing.
 - **Give / Code**: actions from the manifest (items, money) and your own Python code.
-- **Search**: like ArtMoney, but by variable names: snapshot → changes → narrowing.
 - **Story**: choice hints (**Shift+H**: what each option changes, options hidden by a condition
   with a "choose" button, the option's code), choice history with real changes, game screen
   buttons, jump to a label and line search, scene replay, "Where am I", gallery and `persistent`.
-- **Test**: auto-play (new options / random / first, a "game waits for the player" watchdog),
+- **Test** (sections on the left): auto-play (new options / random / first, a "game waits for the player" watchdog),
   routes (record choices and replay them after a game update), line and scene coverage, unseen
   scenes and "how to get there", bug notes (**Shift+B**: text + place + screenshot).
-- **Settings**: menu language (Русский / English), studio remote, appearance, HUD, menu key,
-  tester report, "Remove menu traces".
+- **Settings** (sections on the left): look (language, color, size, full or **simple mode** without
+  "Test", "Code" and list tools), HUD while playing, all keys, studio remote, console, tester
+  report, "Remove menu traces".
 - **Game profile**: "to profile" on freezes makes them apply on every start.
 - Line translation via [AutoTranslatorMoon](https://github.com/moonlivedt-oss/AutoTranslatorMoon)
   (`zzz_testmenu_translate.rpy`): text goes to the translator on this PC, the translation appears
@@ -205,10 +209,16 @@ Before the first write a copy `<file>.tm_bak` is kept next to the file.
 
 ## Studio
 
-`python studio.py` (PyQt6, dark theme): the game list with install state and engine badge, stat and
-action editors, data checks, Ren'Py lint, launching the game, the whole pipeline in one click, stat
-candidates with readable names, quick install, the game library, the remote, the save editor. The
-studio interface is in Russian.
+`python studio.py` (PyQt6, dark theme). On the left: sections Games, Library, Remote, Saves, and Find
+(Ctrl+K) and Tour at the bottom. Games are cards (dot: green — menu up to date, yellow — outdated,
+empty — none; a colored engine badge). The selected game has one main button that fits the state
+(install, update or apply the menu; the studio shows what will change first), "Run" and "•••" for
+the rarer actions. Setup goes in steps: 1 Main, 2 Find variables, 3 Stats, 4 Give. The log is a
+status line at the bottom that opens by itself on an error. The studio interface is in Russian.
+
+Menu and studio colors come from one file, `engines/_shared/tm_tokens.json`;
+`python tools/gen_tokens.py` rebuilds them for Ren'Py, the web menu, the studio, Godot, Unity and
+GameMaker.
 
 ## Manifest and pipeline (for your own games)
 

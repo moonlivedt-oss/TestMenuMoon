@@ -211,17 +211,18 @@ screen tm_tab_stats():
                         spacing 6
                         use tm_icon("snow", 22)
                         text ("%d  снять" % len(tm_ui.frozen)) style "tm_seg_text" yalign 0.5
-            textbutton "•••":
-                style "tm_seg" text_style "tm_seg_text"
-                yalign 0.5
-                selected tm_ui.vals_tools
-                tooltip "Источник списка, проверка путей, перенос значений, профиль"
-                action ToggleField(tm_ui, "vals_tools")
+            if not tm_simple():
+                textbutton "•••":
+                    style "tm_seg" text_style "tm_seg_text"
+                    yalign 0.5
+                    selected tm_ui.vals_tools
+                    tooltip "Источник списка, проверка путей, перенос значений, профиль"
+                    action ToggleField(tm_ui, "vals_tools")
             if _pages > 1:
                 textbutton "‹" style "tm_icon_btn" text_style "tm_icon_text" sensitive (_page > 0) action Function(tm_stat_page, -1)
                 text ("%d / %d" % (_page + 1, _pages)) style "tm_dim" yalign 0.5
                 textbutton "›" style "tm_icon_btn" text_style "tm_icon_text" sensitive (_page < _pages - 1) action Function(tm_stat_page, 1)
-        if tm_ui.vals_tools:
+        if tm_ui.vals_tools and not tm_simple():
             hbox:
                 spacing 8
                 text "список:" style "tm_dim" yalign 0.5

@@ -280,6 +280,8 @@ init -4 python:
         tabs += [("story", u"Сюжет", u"Подсказки выборов, переход к метке и реплике, галерея, персонажи"),
                  ("checklist", u"Тест", u"Авто-прохождение, маршруты, покрытие, непросмотренные сцены, заметки о багах"),
                  ("settings", u"Настройки", u"Цвет, прозрачность, размер, HUD, консоль")]
+        if tm_simple():   # простой режим: без «Теста» и «Кода» (готовая выдача остаётся)
+            tabs = [t for t in tabs if t[0] != "checklist" and not (t[0] == "actions" and not getattr(store, "tm_actions", None))]
         return tabs
 
     def tm_toggle_dev():

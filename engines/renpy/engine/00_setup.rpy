@@ -128,12 +128,8 @@ init -10 python:
             self.vals_tools = False   # «Значения»: ряд инструментов списка (за «•••»)
             self.test_sec = "auto"    # «Тест»: раздел слева
             self.set_sec = "look"     # «Настройки»: раздел слева
-            # --- компоновка 2026-10-13 ---
-            self.vals_mode = "stats"  # «Значения»: stats — мои статы, scan — найти переменную
-            self.row_open = ""        # «Значения»: строка с раскрытыми редкими действиями
-            self.vals_tools = False   # «Значения»: ряд инструментов списка (за «•••»)
-            self.test_sec = "auto"    # «Тест»: раздел слева
-            self.set_sec = "look"     # «Настройки»: раздел слева
+            self.pal_open = False     # Ctrl+K: поиск по функциям меню
+            self.pal_text = ""
 
     tm_ui = _TmUI()
 
